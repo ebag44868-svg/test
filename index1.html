@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>로또 번호 추첨기</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        font-family: -apple-system, BlinkMacSystemFont, "Pretendard", "Segoe UI", sans-serif;
+        color: #111;
+        background: radial-gradient(circle at 20% 20%, rgba(255,255,255,1), rgba(255,255,255,0) 35%),
+          linear-gradient(135deg, #f7f9fc, #e8edf4);
+      }
+
+      .lotto-container {
+        width: 700px;
+        max-width: 92%;
+        padding: 55px 50px;
+        text-align: center;
+        background: rgba(255,255,255,0.82);
+        backdrop-filter: blur(25px);
+        -webkit-backdrop-filter: blur(25px);
+        border: 1px solid rgba(255,255,255,0.9);
+        border-radius: 35px;
+        box-shadow: 0 30px 80px rgba(20,30,50,0.13);
+      }
+
+      .label {
+        display: inline-block;
+        padding: 7px 14px;
+        margin-bottom: 18px;
+        border-radius: 100px;
+        background: #111;
+        color: white;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 1.8px;
+      }
+
+      h1 {
+        font-size: 58px;
+        letter-spacing: -3px;
+        margin-bottom: 10px;
+      }
+
+      .subtitle {
+        font-size: 15px;
+        color: #777;
+        margin-bottom: 45px;
+      }
+
+      .lotto-numbers {
+        min-height: 80px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-bottom: 38px;
+      }
+
+      .placeholder {
+        font-size: 14px;
+        color: #aaa;
+      }
+
+      .ball {
+        width: 68px;
+        height: 68px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 50%;
+        color: white;
+        font-size: 23px;
+        font-weight: 800;
+        box-shadow: inset 0 2px 4px rgba(255,255,255,0.4), 0 10px 25px rgba(0,0,0,0.16);
+        opacity: 0;
+        transform: translateY(20px) scale(0.6);
+        animation: ballAppear 0.5s ease forwards;
+      }
+
+      @keyframes ballAppear {
+        0% {
+          opacity: 0;
+          transform: translateY(25px) scale(0.6) rotate(-20deg);
+        }
+
+        65% {
+          opacity: 1;
+          transform: translateY(-6px) scale(1.08);
+        }
+
+        100% {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
+      }
+
+      .yellow { background: linear-gradient(145deg, #ffd052, #eda600); }
+      .blue { background: linear-gradient(145deg, #58afff, #2674ce); }
+      .red { background: linear-gradient(145deg, #ff6d6d, #dc3535); }
+      .gray { background: linear-gradient(145deg, #a4abb3, #6d747d); }
+      .green { background: linear-gradient(145deg, #55cf86, #259855); }
+
+      .button-area {
+        display: flex;
+        justify-content: center;
+        gap: 10px;
+      }
+
+      button {
+        border: none;
+        cursor: pointer;
+        font-family: inherit;
+        transition: 0.2s;
+      }
+
+      .draw-button {
+        padding: 17px 30px;
+        min-width: 190px;
+        border-radius: 17px;
+        background: #111;
+        color: white;
+        font-size: 15px;
+        font-weight: 700;
+      }
+
+      .draw-button:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 12px 25px rgba(0,0,0,0.18);
+      }
+
+      .draw-button:active {
+        transform: scale(0.97);
+      }
+
+      .reset-button {
+        padding: 17px 22px;
+        border-radius: 17px;
+        background: #edf0f4;
+        color: #555;
+        font-weight: 600;
+      }
+
+      .reset-button:hover {
+        background: #e1e5ea;
+      }
+
+      .history-section {
+        margin-top: 45px;
+        padding-top: 30px;
+        border-top: 1px solid #e4e4e4;
+        text-align: left;
+      }
+
+      .history-section h2 {
+        margin-bottom: 15px;
+        font-size: 12px;
+        color: #999;
+        letter-spacing: 1.5px;
+      }
+
+      #historyList {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+
+      .history-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 13px 16px;
+        border-radius: 14px;
+        background: rgba(244,246,249,0.9);
+        font-size: 13px;
+        color: #777;
+      }
+
+      .history-number {
+        color: #111;
+        font-weight: 700;
+        letter-spacing: 2px;
+      }
+
+      .empty-history {
+        color: #aaa;
+        font-size: 13px;
+      }
+
+      footer {
+        margin-top: 30px;
+        font-size: 11px;
+        color: #aaa;
+      }
+
+      @media (max-width: 600px) {
+        .lotto-container {
+          padding: 40px 20px;
+          border-radius: 25px;
+        }
+
+        h1 {
+          font-size: 45px;
+        }
+
+        .ball {
+          width: 52px;
+          height: 52px;
+          font-size: 18px;
+        }
+
+        .lotto-numbers {
+          gap: 8px;
+        }
+
+        .history-item {
+          font-size: 11px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="lotto-container">
+      <div class="label">LOTTO</div>
+      <h1>Lucky Draw</h1>
+      <p class="subtitle">매번 다른 행운의 번호를 뽑아보세요.</p>
+
+      <div id="lottoNumbers" class="lotto-numbers" aria-live="polite">
+        <div class="placeholder">번호 추첨 버튼을 눌러주세요</div>
+      </div>
+
+      <div class="button-area">
+        <button id="drawButton" class="draw-button" type="button">번호 추첨</button>
+        <button id="resetButton" class="reset-button" type="button">초기화</button>
+      </div>
+
+      <section class="history-section">
+        <h2>최근 추첨 기록</h2>
+        <div id="historyList"></div>
+      </section>
+
+      <footer>오늘의 행운을 뽑아보세요</footer>
+    </main>
+
+    <script>
+      const lottoNumbers = document.getElementById("lottoNumbers");
+      const drawButton = document.getElementById("drawButton");
+      const resetButton = document.getElementById("resetButton");
+      const historyList = document.getElementById("historyList");
+
+      let history = [];
+
+      function generateNumbers() {
+        const numbers = [];
+
+        while (numbers.length < 6) {
+          const randomNumber = Math.floor(Math.random() * 45) + 1;
+
+          if (!numbers.includes(randomNumber)) {
+            numbers.push(randomNumber);
+          }
+        }
+
+        numbers.sort((a, b) => a - b);
+        return numbers;
+      }
+
+      function getBallColor(number) {
+        if (number <= 10) return "yellow";
+        if (number <= 20) return "blue";
+        if (number <= 30) return "red";
+        if (number <= 40) return "gray";
+        return "green";
+      }
+
+      function showNumbers(numbers) {
+        lottoNumbers.innerHTML = "";
+
+        numbers.forEach((number, index) => {
+          const ball = document.createElement("div");
+          ball.classList.add("ball", getBallColor(number));
+          ball.textContent = number;
+          ball.style.animationDelay = `${index * 0.12}s`;
+          lottoNumbers.appendChild(ball);
+        });
+      }
+
+      function showHistory() {
+        historyList.innerHTML = "";
+
+        if (history.length === 0) {
+          historyList.innerHTML = '<div class="empty-history">아직 추첨 기록이 없습니다.</div>';
+          return;
+        }
+
+        history.forEach((numbers, index) => {
+          const item = document.createElement("div");
+          item.className = "history-item";
+
+          item.innerHTML = `
+            <span>${history.length - index}회차</span>
+            <span class="history-number">${numbers.join(" · ")}</span>
+          `;
+
+          historyList.appendChild(item);
+        });
+      }
+
+      drawButton.addEventListener("click", function () {
+        const numbers = generateNumbers();
+        showNumbers(numbers);
+
+        history.unshift(numbers);
+        history = history.slice(0, 5);
+        showHistory();
+      });
+
+      resetButton.addEventListener("click", function () {
+        history = [];
+        lottoNumbers.innerHTML = '<div class="placeholder">번호 추첨 버튼을 눌러주세요</div>';
+        showHistory();
+      });
+    </script>
+  </body>
+</html>
