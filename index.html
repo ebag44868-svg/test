@@ -1,0 +1,1191 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>파이썬 오프라인 채점기</title>
+<meta name="theme-color" content="#F6F7F4">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="파이썬 채점">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="icon-180.png">
+<link rel="icon" href="icon-192.png">
+<style>:root{
+  --paper:#F6F7F4; --sheet:#FFFFFF; --ink:#23282A; --ink2:#5B6466; --ink3:#8A9294;
+  --rule:#E8CDD2; --rule2:#E6E8E3; --rose:#C8364F; --rose-soft:#FBEEF1;
+  --board:#20352B; --board2:#2A4437; --board3:#365443; --chalk:#EDEFE6; --chalk-dim:#86A091;
+  --cy:#F1DE8A; --cp:#F2A3B3; --cb:#A9CFE6; --cg:#B9E0B0;
+  --pass:#2F7D53; --pass-soft:#EAF5EE; --warn:#9A620E; --warn-soft:#FBF3E4;
+  --mono: ui-monospace, Menlo, "SF Mono", Consolas, "Apple SD Gothic Neo", monospace;
+  --sans: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+  --lh:24px;
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--paper);color:var(--ink);font:16px/1.6 var(--sans);-webkit-text-size-adjust:100%;overscroll-behavior:none}
+button{font:inherit;color:inherit;cursor:pointer}
+code,pre,kbd{font-family:var(--mono)}
+:focus-visible{outline:2px solid var(--rose);outline-offset:2px}
+.hidden{display:none!important}
+
+/* 상단 */
+header.top{position:sticky;top:0;z-index:30;display:flex;align-items:center;gap:6px 18px;flex-wrap:wrap;
+  padding:calc(env(safe-area-inset-top) + 8px) 16px 0;background:var(--paper);border-bottom:1px solid var(--rule)}
+.brand{font-weight:800;font-size:17px;letter-spacing:-.2px;margin-right:6px;padding-bottom:8px;white-space:nowrap}
+.brand b{color:var(--rose)}
+nav.tabs{display:flex;gap:2px;flex:1;min-width:0;overflow-x:auto}
+nav.tabs a{padding:8px 12px 10px;text-decoration:none;color:var(--ink2);font-weight:600;border-bottom:3px solid transparent;white-space:nowrap}
+nav.tabs a[aria-current="page"]{color:var(--ink);border-color:var(--rose)}
+.status{display:flex;gap:10px;padding-bottom:8px;font-size:13px;color:var(--ink2);white-space:nowrap}
+.dot{display:inline-flex;align-items:center;gap:5px}
+.dot::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ink3)}
+.dot.ok::before{background:var(--pass)} .dot.busy::before{background:#D9A430} .dot.bad::before{background:var(--rose)}
+
+main{padding:14px 16px calc(env(safe-area-inset-bottom) + 40px)}
+.view{max-width:1400px;margin:0 auto}
+
+/* 버튼 */
+.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid #C9CEC9;background:var(--sheet);border-radius:8px;padding:8px 14px;font-weight:600;min-height:40px}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:var(--board);border-color:var(--board);color:var(--chalk)}
+.btn.rose{background:var(--rose);border-color:var(--rose);color:#fff}
+.btn.ghost{border-color:transparent;background:transparent;color:var(--ink2)}
+.btn[disabled]{opacity:.45;pointer-events:none}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.spacer{flex:1}
+.small{font-size:13px;color:var(--ink2)}
+
+/* 문제 화면 */
+.pv{display:grid;grid-template-columns:1fr;gap:16px}
+@media (min-width:960px){ .pv{grid-template-columns:minmax(320px,38%) 1fr;align-items:start} .pv .ppane{position:sticky;top:76px;max-height:calc(100vh - 92px);overflow:auto} }
+.ppane{background:var(--sheet);border:1px solid var(--rule2);border-radius:10px;padding:16px 18px}
+.pnav{display:flex;align-items:center;gap:6px;margin:-4px 0 10px}
+.pnav .btn{min-height:34px;padding:4px 10px}
+.ptitle{font-size:21px;font-weight:800;margin:2px 0 2px;letter-spacing:-.3px}
+.pid{color:var(--ink3);font-size:13px}
+.psec{margin-top:14px}
+.psec h3{font-size:14px;margin:0 0 4px;color:var(--ink2)}
+.psec p{margin:0}
+.ex{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.ex.noin{grid-template-columns:1fr}
+.exbox{border:1px solid var(--rule2);border-radius:8px;background:#FAFBF9;overflow:hidden}
+.exbox .exh{display:flex;align-items:center;justify-content:space-between;font-size:12px;color:var(--ink2);padding:4px 8px;border-bottom:1px solid var(--rule2)}
+.exbox pre{margin:0;padding:8px 10px;font-size:14px;line-height:1.5;white-space:pre;overflow-x:auto}
+.linkbtn{border:0;background:none;color:var(--rose);font-size:12px;font-weight:700;padding:2px 4px}
+.badge{display:inline-block;font-size:12px;font-weight:700;border-radius:999px;padding:2px 9px;margin:6px 6px 0 0}
+.badge.must{background:var(--rose-soft);color:var(--rose)}
+.badge.soft{background:#EEF0EC;color:var(--ink2)}
+details.reveal{margin-top:12px;border-top:1px dashed var(--rule);padding-top:10px}
+details.reveal summary{font-weight:700;color:var(--ink2);cursor:pointer}
+.answer{margin:8px 0 0;background:var(--board);color:var(--chalk);border-radius:8px;padding:10px 12px;font-size:14px;line-height:1.6;white-space:pre;overflow-x:auto}
+
+/* 문제 목록 서랍 */
+.drawer{position:fixed;inset:0;z-index:50;display:flex}
+.drawer .shade{flex:1;background:rgba(20,30,25,.35)}
+.drawer .panel{order:-1;width:min(360px,88vw);background:var(--sheet);height:100%;overflow:auto;padding:calc(env(safe-area-inset-top) + 14px) 14px 30px;border-right:1px solid var(--rule)}
+.chap{margin:12px 0 4px;display:flex;justify-content:space-between;font-weight:800;font-size:14px;border-bottom:1px solid var(--rule);padding-bottom:3px}
+.plist button{display:flex;width:100%;align-items:center;gap:10px;text-align:left;border:0;background:none;padding:8px 6px;border-radius:6px}
+.plist button[aria-current="true"]{background:var(--rose-soft)}
+.mark{width:20px;text-align:center;font-weight:800}
+.mark.ok{color:var(--pass)} .mark.no{color:var(--rose)} .mark.none{color:#C5CAC5}
+
+/* 에디터(칠판) */
+.work{display:flex;flex-direction:column;gap:10px;min-width:0}
+.keys{display:flex;gap:4px;overflow-x:auto;padding:2px 0}
+.keys button{flex:0 0 auto;min-width:40px;height:36px;border:1px solid #CBD1CB;background:var(--sheet);border-radius:6px;font-family:var(--mono);font-size:15px;padding:0 8px}
+.ed{display:flex;background:var(--board);border-radius:10px;overflow:hidden;height:clamp(240px,40vh,540px);border:1px solid var(--board3)}
+.ed.short{height:clamp(200px,30vh,420px)}
+.ed-gutter{flex:0 0 auto;min-width:44px;padding:12px 8px 12px 6px;text-align:right;color:var(--chalk-dim);font:14px/var(--lh) var(--mono);user-select:none;overflow:hidden;background:var(--board2)}
+.ed-gutter div{height:var(--lh)}
+.ed-gutter .gerr{color:#fff;background:var(--rose);border-radius:3px;padding-right:4px}
+.ed-gutter .gcur{color:var(--board);background:var(--cy);border-radius:3px;padding-right:4px}
+.ed-body{position:relative;flex:1;min-width:0}
+.ed-hl,.ed-ta{position:absolute;inset:0;margin:0;padding:12px 14px 12px 12px;font:16px/var(--lh) var(--mono);font-variant-ligatures:none;tab-size:4;white-space:pre;letter-spacing:0;border:0}
+.ed-hl{overflow:hidden;color:var(--chalk);pointer-events:none}
+.ed-hl .wrap{display:inline-block;min-width:100%}
+.ed-hl .L{display:block;height:var(--lh);padding-right:14px}
+.ed-ta{width:100%;height:100%;resize:none;background:transparent;color:transparent;-webkit-text-fill-color:transparent;caret-color:#fff;outline:none;overflow:auto}
+.ed-ta::selection{background:rgba(241,222,138,.35);-webkit-text-fill-color:transparent}
+.ed-ta::placeholder{color:var(--chalk-dim);-webkit-text-fill-color:var(--chalk-dim)}
+.L.lerr{background:rgba(200,54,79,.30);box-shadow:inset 3px 0 var(--cp)}
+.L.lloop{background:rgba(242,163,179,.13)}
+.L.lcur{background:rgba(241,222,138,.22);box-shadow:inset 3px 0 var(--cy)}
+.t-k{color:var(--cp);font-weight:600} .t-b{color:var(--cb)} .t-s{color:var(--cy)} .t-n{color:var(--cg)} .t-c{color:var(--chalk-dim);font-style:italic}
+.t-err{text-decoration:underline wavy #FF7A90;text-decoration-thickness:2px;text-underline-offset:4px;background:rgba(255,122,144,.18)}
+
+.io{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:700px){.io{grid-template-columns:minmax(180px,34%) 1fr}}
+.field label{display:block;font-size:13px;font-weight:700;color:var(--ink2);margin-bottom:4px}
+textarea.plain,input.plain{width:100%;border:1px solid #CBD1CB;border-radius:8px;padding:8px 10px;font:16px/1.5 var(--mono);background:var(--sheet);color:var(--ink)}
+textarea.plain{min-height:72px;resize:vertical;white-space:pre}
+.toolbar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+
+/* 결과 */
+.res{background:var(--sheet);border:1px solid var(--rule2);border-radius:10px;padding:14px 16px;min-height:60px}
+.res:empty{display:none}
+.verdict{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+.verdict .big{font-size:22px;font-weight:800;letter-spacing:-.3px}
+.verdict .big.ok{color:var(--pass)} .verdict .big.no{color:var(--rose)} .verdict .big.warn{color:var(--warn)}
+.tests{display:flex;flex-direction:column;gap:6px}
+.trow{border:1px solid var(--rule2);border-radius:8px;overflow:hidden}
+.trow>button{display:flex;width:100%;gap:10px;align-items:center;text-align:left;border:0;background:#FAFBF9;padding:8px 10px}
+.trow.ok>button{background:var(--pass-soft)} .trow.no>button{background:var(--rose-soft)}
+.trow .tdetail{padding:10px 12px;border-top:1px solid var(--rule2)}
+.outbox{margin:4px 0 0;background:#FAFBF9;border:1px solid var(--rule2);border-radius:6px;padding:8px 10px;font:14px/1.55 var(--mono);white-space:pre;overflow-x:auto;max-height:340px;overflow-y:auto}
+.diff{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+@media (max-width:620px){.diff{grid-template-columns:1fr}}
+.diff h4{margin:0;font-size:13px;color:var(--ink2)}
+.dl{display:flex} .dl .n{flex:0 0 26px;color:var(--ink3);text-align:right;padding-right:8px;user-select:none}
+.dl.bad{background:var(--rose-soft)} .dl.miss{background:#FFF6D9}
+.ch{background:#FFB3C0;border-radius:2px} .ws{color:#B3B9B4}
+.hint{border-left:4px solid var(--rose);background:var(--rose-soft);padding:10px 12px;border-radius:0 8px 8px 0;margin:8px 0}
+.hint.warn{border-color:#D9A430;background:var(--warn-soft)}
+.hint.ok{border-color:var(--pass);background:var(--pass-soft)}
+.hint h4{margin:0 0 4px;font-size:15px}
+.hint ul{margin:4px 0 0;padding-left:20px}
+.hint .where{font-size:13px;color:var(--ink2)}
+.tb{margin:6px 0 0;font:13px/1.5 var(--mono);white-space:pre-wrap;color:#5D3440;background:#FDF7F8;border-radius:6px;padding:8px 10px}
+
+/* 한 줄씩 보기 */
+.stepper{display:flex;flex-direction:column;gap:10px}
+.stepbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.stepbar .btn{min-height:38px;padding:4px 12px;font-family:var(--mono)}
+.stepbar input[type=range]{flex:1;min-width:140px;accent-color:var(--rose)}
+.stepcols{display:grid;grid-template-columns:1fr;gap:10px}
+@media (min-width:700px){.stepcols{grid-template-columns:1fr 1fr}}
+table.vars{border-collapse:collapse;width:100%;font-size:14px}
+table.vars th,table.vars td{border-bottom:1px solid var(--rule2);padding:5px 8px;text-align:left;vertical-align:top}
+table.vars td.v{font-family:var(--mono);word-break:break-all}
+table.vars tr.chg td{background:#FFF6D9}
+table.vars .ty{color:var(--ink3);font-size:12px}
+
+/* 모의고사 */
+.examtop{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.seg{display:inline-flex;border:1px solid #CBD1CB;border-radius:8px;overflow:hidden}
+.seg button{border:0;background:var(--sheet);padding:8px 16px;font-weight:700}
+.seg button[aria-pressed="true"]{background:var(--ink);color:#fff}
+.sheet{background:var(--sheet);border:1px solid var(--rule2);border-radius:4px;padding:20px 22px;max-width:980px;margin:0 auto}
+.sheet-head{border:2px solid var(--ink);display:flex;align-items:stretch;margin-bottom:16px}
+.sheet-head .t{flex:1;padding:10px 14px}
+.sheet-head .t b{font-size:20px;letter-spacing:-.3px}
+.sheet-head .s{border-left:2px solid var(--ink);padding:10px 14px;min-width:150px;text-align:center}
+.sheet-head .score{font-size:30px;font-weight:800;color:var(--rose);line-height:1.1}
+.qgrid{columns:2;column-gap:34px;column-rule:1px solid var(--rule)}
+@media (max-width:880px){.qgrid{columns:1}}
+.q{break-inside:avoid;margin:0 0 22px;padding-top:10px;position:relative}
+.qh{display:flex;gap:8px}
+.qno{font-weight:800;position:relative;min-width:30px}
+.qno.okm::after{content:"";position:absolute;left:-12px;top:-7px;width:38px;height:38px;border:3px solid var(--rose);border-radius:50%;transform:rotate(-8deg)}
+.qno.nom::after{content:"";position:absolute;left:8px;top:-8px;width:4px;height:44px;background:var(--rose);transform:rotate(32deg);border-radius:2px}
+.pts{color:var(--ink2);font-size:14px;white-space:nowrap}
+.qcode{margin:8px 0;background:#F7F8F6;border:1px solid var(--rule2);border-radius:4px;padding:8px 10px;font:14px/1.5 var(--mono);white-space:pre;overflow-x:auto}
+.qcode.lines{counter-reset:ln}
+.qcode.lines span{display:block;counter-increment:ln}
+.qcode.lines span::before{content:counter(ln);display:inline-block;width:20px;color:var(--ink3);margin-right:8px;text-align:right}
+.bogi{position:relative;border:1px solid var(--ink);padding:16px 12px 8px;margin:14px 0 8px}
+.bogi::before{content:"<보기>";position:absolute;top:-11px;left:50%;transform:translateX(-50%);background:var(--sheet);padding:0 8px;font-size:14px;font-weight:700}
+.bogi div{margin:2px 0}
+.opts{list-style:none;margin:6px 0 0;padding:0;display:flex;flex-direction:column;gap:3px}
+.opt{display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;border:0;background:none;padding:5px 4px;border-radius:6px}
+.opt .bub{flex:0 0 auto;width:26px;height:20px;border:1.5px solid var(--rose);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--rose);margin-top:2px;font-weight:700}
+.opt[aria-pressed="true"] .bub{background:var(--ink);border-color:var(--ink);color:#fff}
+.opt .ot{white-space:pre-wrap}
+.opt .ot.code{font:14px/1.5 var(--mono)}
+.opt.right .bub{box-shadow:0 0 0 3px var(--sheet),0 0 0 5px var(--rose)}
+.opt.wrongpick .ot{text-decoration:line-through;text-decoration-color:var(--rose)}
+.sapart{margin:8px 0 10px}
+.sapart .lab{font-weight:700;margin-right:6px}
+.sapart textarea,.sapart input{margin-top:4px}
+.fieldrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}
+.fieldrow>div{flex:1;min-width:120px}
+.fieldrow .fn{font-size:12px;color:var(--ink2)}
+.verd{font-size:13px;font-weight:700;margin-top:4px}
+.verd.ok{color:var(--pass)} .verd.no{color:var(--rose)}
+.expl{margin-top:8px;font-size:14px;background:#F8F9F7;border-left:3px solid var(--rose);padding:8px 10px;border-radius:0 6px 6px 0}
+.expl b{color:var(--rose)}
+.scorecard{max-width:980px;margin:0 auto 14px;background:var(--sheet);border:1px solid var(--rule2);border-radius:10px;padding:14px 18px;display:flex;gap:20px;flex-wrap:wrap;align-items:center}
+.scorecard .tot{font-size:40px;font-weight:800;color:var(--rose);line-height:1}
+.scorecard .tot small{font-size:16px;color:var(--ink2);font-weight:600}
+.override{font-size:12px;color:var(--ink2);display:inline-flex;gap:4px;align-items:center;margin-left:8px}
+
+/* 도움말 */
+.help{max-width:900px;margin:0 auto}
+.help section{background:var(--sheet);border:1px solid var(--rule2);border-radius:10px;padding:14px 18px;margin-bottom:12px}
+.help h2{font-size:18px;margin:0 0 8px}
+.help h3{font-size:15px;margin:14px 0 4px}
+.help code{background:#F1F3EF;border-radius:4px;padding:1px 5px;font-size:14px}
+.errcard{border-top:1px solid var(--rule2);padding:10px 0}
+.errcard:first-of-type{border-top:0}
+.toast{position:fixed;left:50%;bottom:calc(env(safe-area-inset-bottom) + 18px);transform:translateX(-50%);background:var(--ink);color:#fff;padding:10px 16px;border-radius:8px;font-size:14px;z-index:60;max-width:90vw}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+@media (orientation:portrait){.ed{height:clamp(220px,32vh,480px)}}
+</style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">파이썬 <b>채점</b></div>
+  <nav class="tabs" aria-label="화면">
+    <a href="#p" data-v="v-prob">정올 문제</a>
+    <a href="#free" data-v="v-free">자유 실행</a>
+    <a href="#exam" data-v="v-exam">이론 모의고사</a>
+    <a href="#help" data-v="v-help">도움말</a>
+  </nav>
+  <div class="status" aria-live="polite"><span id="st-engine" class="dot busy">엔진 불러오는 중</span><span id="st-offline" class="dot">오프라인 확인 중</span></div>
+</header>
+
+<div id="engine-banner" class="hint hidden" style="margin:12px 16px 0"></div>
+<main>
+  <!-- 정올 문제 -->
+  <section class="view" id="v-prob">
+    <div class="pv">
+      <div class="ppane" id="ppane"></div>
+      <div class="work">
+        <div id="p-editor"></div>
+        <div class="toolbar">
+          <button class="btn primary runbtn needs-engine" id="p-grade" disabled>채점하기</button>
+          <button class="btn runbtn needs-engine" id="p-run" disabled>실행</button>
+          <button class="btn runbtn needs-engine" id="p-step" disabled>한 줄씩 보기</button>
+          <button class="btn rose stopbtn hidden">중지</button>
+          <span class="spacer"></span>
+          <button class="btn ghost" id="p-reset">코드 지우기</button>
+        </div>
+        <div class="field" id="p-stdin-wrap"><label for="p-stdin">입력값 (‘실행’·‘한 줄씩 보기’에 쓰임, 채점은 테스트 입력을 자동으로 넣음)</label>
+          <textarea class="plain" id="p-stdin" rows="3" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></div>
+        <div class="res" id="p-res" aria-live="polite"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 자유 실행 -->
+  <section class="view hidden" id="v-free">
+    <div class="work" style="max-width:1100px;margin:0 auto">
+      <div id="f-editor"></div>
+      <div class="toolbar">
+        <button class="btn primary runbtn needs-engine" id="f-run" disabled>실행</button>
+        <button class="btn runbtn needs-engine" id="f-step" disabled>한 줄씩 보기</button>
+        <button class="btn rose stopbtn hidden">중지</button>
+      </div>
+      <div class="field"><label for="f-stdin">입력값 (input()이 줄마다 하나씩 읽음)</label>
+        <textarea class="plain" id="f-stdin" rows="3" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"></textarea></div>
+      <div class="res" id="f-res" aria-live="polite"></div>
+    </div>
+  </section>
+
+  <!-- 이론 모의고사 -->
+  <section class="view hidden" id="v-exam">
+    <div class="examtop" style="max-width:980px;margin:0 auto 12px">
+      <div class="seg" role="group" aria-label="회차"><button>1회</button><button>2회</button></div>
+      <span class="small">답은 자동 저장돼요. 시간 제한 없음.</span>
+      <span class="spacer"></span>
+      <button class="btn ghost" id="exam-reset">답안 지우기</button>
+      <button class="btn rose" id="exam-grade">채점하기</button>
+    </div>
+    <div id="exam-body"></div>
+  </section>
+
+  <!-- 도움말 -->
+  <section class="view hidden help" id="v-help">
+    <section>
+      <h2>채점 방식</h2>
+      <p>문제마다 예제 입력과 직접 만든 숨은 입력(총 3~10개)으로 실행해서 출력을 정답과 줄 단위로 비교해요. <b>줄 끝 공백과 마지막 빈 줄은 무시</b>하고, 줄 앞 공백·단어 사이 공백·대소문자는 정확히 비교해요. 정올 실제 채점 데이터는 공개되지 않아서 판정이 100% 같지는 않아요.</p>
+      <p>‘삼항 연산자 필수’처럼 빨간 배지가 붙은 문제는 출력이 맞아도 그 문법을 쓰지 않으면 ‘조건 위반’이에요.</p>
+      <h3>버튼</h3>
+      <ul>
+        <li><b>채점하기</b>: 모든 테스트 실행. 틀린 테스트를 누르면 정답 출력과 내 출력을 나란히 보여주고 다른 글자를 표시해요. (외장 키보드: ⌘ + Enter)</li>
+        <li><b>실행</b>: 입력값 칸의 내용으로 한 번만 실행. 예제 입력이면 정답과도 비교해요.</li>
+        <li><b>한 줄씩 보기</b>: 코드가 어떤 순서로 실행되는지, 각 단계에서 변수 값이 어떻게 바뀌는지 한 단계씩 넘겨 볼 수 있어요. 반복문 추적 연습에 좋아요.</li>
+        <li><b>중지</b>: 실행이 멈추지 않을 때. 6초가 지나도 안 끝나면 무한 루프로 보고 자동으로 멈추고, 계속 반복되던 줄을 칠해 줘요.</li>
+      </ul>
+      <h3>아이패드 입력 팁</h3>
+      <ul>
+        <li>코드 칸 위의 ⇥ 키는 공백 4칸 들여쓰기, ⇤는 내어쓰기. 콜론(:)으로 끝나는 줄에서 줄을 바꾸면 자동으로 4칸 들여써요.</li>
+        <li>둥근 따옴표(“ ”)는 자동으로 곧은 따옴표로 바뀌지만, 설정 → 일반 → 키보드 → <b>스마트 구두점</b>을 끄면 더 편해요.</li>
+        <li>코드와 답안은 이 기기 안에만 저장돼요. 홈 화면 앱을 삭제하면 같이 지워져요.</li>
+      </ul>
+      <h3>오프라인</h3>
+      <p>오른쪽 위에 <b>오프라인 준비 완료</b>가 보이면 인터넷 없이 모든 기능이 동작해요. 홈 화면에 추가한 앱은 사파리와 저장 공간이 따로라서, 홈 화면 아이콘으로 처음 열 때 한 번은 인터넷이 연결돼 있어야 해요.</p>
+      <p class="small" id="help-ver"></p>
+    </section>
+    <section>
+      <h2>오류 사전</h2>
+      <p class="small">실행할 때 나오는 오류와 같은 설명이에요.</p>
+      <div id="help-errors"></div>
+    </section>
+  </section>
+</main>
+
+<div class="drawer hidden" id="drawer">
+  <div class="shade"></div>
+  <div class="panel" role="dialog" aria-label="문제 목록">
+    <div class="row"><b style="font-size:18px">문제 목록</b><span class="spacer"></span><span class="small" id="plist-total"></span><button class="btn ghost" id="drawer-close" aria-label="닫기">✕</button></div>
+    <div id="plist"></div>
+  </div>
+</div>
+
+<script id="data" type="application/json">{"problems": [{"id": "9153", "chapter": "출력", "title": "출력 - 연습문제 1", "desc": "화면에 다음과 같이 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "Hello Jungol!"}], "tests": [{"in": "", "out": "Hello Jungol!"}], "solution": "print(\"Hello Jungol!\")", "hint": "문자열은 따옴표로 감싸서 print() 안에 넣는다. 느낌표(!)와 대소문자까지 똑같이.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9155", "chapter": "출력", "title": "출력 - 연습문제 2", "desc": "화면에 다음과 같이 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "My second program.\n2\nprograms"}], "tests": [{"in": "", "out": "My second program.\n2\nprograms"}], "solution": "print(\"My second program.\")\nprint(2)\nprint(\"programs\")", "hint": "print()는 한 번 호출할 때마다 끝에 줄바꿈이 붙는다. 세 줄이면 print()를 세 번 쓰거나 \\n을 쓴다.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9158", "chapter": "출력", "title": "출력 - 연습문제 3", "desc": "화면에 다음과 같이 출력하는 프로그램을 작성하시오.\n\n**단어를 콤마( , ) 2개를 이용하여 분리해서 출력하세요.**", "examples": [{"in": "", "out": "Program number 3\nProgram number 3"}], "tests": [{"in": "", "out": "Program number 3\nProgram number 3"}], "solution": "print(\"Program number 3\")\nprint(\"Program\", \"number\", 3)", "hint": "print()에 값을 쉼표로 나눠 넣으면 값 사이에 공백 한 칸이 자동으로 들어간다. print(\"Program\", \"number\", 3)", "checks": [{"type": "print3", "hard": false, "msg": "쉼표 2개로 값 3개를 나눠 출력하는 print가 보이지 않음 (출력만 맞으면 정올은 통과일 수 있음)"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9160", "chapter": "출력", "title": "출력 - 연습문제 4", "desc": "화면에 다음과 같이 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "*   *\n * *\n  *"}], "tests": [{"in": "", "out": "*   *\n * *\n  *"}], "solution": "print(\"*   *\")\nprint(\" * *\")\nprint(\"  *\")", "hint": "줄 앞의 공백 개수가 중요하다. 1줄: 별-공백3-별, 2줄: 공백1-별-공백1-별, 3줄: 공백2-별. 결과 화면에서 ‘공백 보기’를 켜고 비교해 봐.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9162", "chapter": "출력", "title": "출력 - 연습문제 5", "desc": "화면에 다음과 같이 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "5 + 7 = 5 + 7\n5 + 7 = 12"}], "tests": [{"in": "", "out": "5 + 7 = 5 + 7\n5 + 7 = 12"}], "solution": "print(\"5 + 7 = 5 + 7\")\nprint(\"5 + 7 =\", 5 + 7)", "hint": "따옴표 안은 글자 그대로, 따옴표 밖의 5 + 7은 계산된다. 두 번째 줄은 문자열과 계산식을 쉼표로 이어 보자.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9170", "chapter": "변수와 입력", "title": "변수와 입력 - 연습문제 1", "desc": "**name**과 **age**라는 변수에 각각 \"Kim\"과 15를 대입하여 다음과 같이 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "Kim is 15 years old."}], "tests": [{"in": "", "out": "Kim is 15 years old."}], "solution": "name = \"Kim\"\nage = 15\nprint(name, \"is\", age, \"years old.\")", "hint": "name = \"Kim\", age = 15 로 저장한 뒤 print(name, \"is\", age, \"years old.\")", "checks": [{"type": "vars", "names": ["name", "age"], "hard": false, "msg": "변수 name, age에 값을 대입하는 줄이 없음"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9175", "chapter": "변수와 입력", "title": "변수와 입력 - 연습문제 2", "desc": "입력받은 문자열을 출력예와 같이 출력하는 프로그램을 작성하시오.", "examples": [{"in": "Lee", "out": "Your name is Lee"}, {"in": "Bob", "out": "Your name is Bob"}], "tests": [{"in": "Lee", "out": "Your name is Lee"}, {"in": "Bob", "out": "Your name is Bob"}, {"in": "Kim", "out": "Your name is Kim"}, {"in": "Alice", "out": "Your name is Alice"}, {"in": "Park", "out": "Your name is Park"}], "solution": "name = input()\nprint(\"Your name is\", name)", "hint": "input() 괄호 안에 안내 문구를 넣으면 그 문구도 출력돼서 오답이 된다. 괄호는 비워 두기.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9179", "chapter": "변수와 입력", "title": "변수와 입력 - 연습문제 3", "desc": "입력받은 정수를 출력하는 프로그램을 작성하시오.", "examples": [{"in": "100", "out": "입력받은 정수: 100"}, {"in": "17", "out": "입력받은 정수: 17"}], "tests": [{"in": "100", "out": "입력받은 정수: 100"}, {"in": "17", "out": "입력받은 정수: 17"}, {"in": "0", "out": "입력받은 정수: 0"}, {"in": "-5", "out": "입력받은 정수: -5"}, {"in": "999", "out": "입력받은 정수: 999"}], "solution": "n = int(input())\nprint(\"입력받은 정수:\", n)", "hint": "int(input())으로 정수로 바꿔 저장. 출력의 콜론(:) 뒤 공백 한 칸은 쉼표가 만들어 준다.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9183", "chapter": "변수와 입력", "title": "변수와 입력 - 연습문제 4", "desc": "입력받은 실수를 출력하는 프로그램을 작성하시오.", "examples": [{"in": "1.25", "out": "입력받은 실수: 1.25"}], "tests": [{"in": "1.25", "out": "입력받은 실수: 1.25"}, {"in": "3.5", "out": "입력받은 실수: 3.5"}, {"in": "0.1", "out": "입력받은 실수: 0.1"}, {"in": "10.75", "out": "입력받은 실수: 10.75"}, {"in": "99.9", "out": "입력받은 실수: 99.9"}], "solution": "n = float(input())\nprint(\"입력받은 실수:\", n)", "hint": "float(input())으로 실수로 바꾼다.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9187", "chapter": "변수와 입력", "title": "변수와 입력 - 연습문제 5", "desc": "한 줄에 정수 두 개를 입력받아 연산 결과를 다음과 같이 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 100 이하의 두 정수가 주어진다.", "output": "두 수의 곱셈식을 출력한다.", "examples": [{"in": "10 20", "out": "10 * 20 = 200"}], "tests": [{"in": "10 20", "out": "10 * 20 = 200"}, {"in": "3 7", "out": "3 * 7 = 21"}, {"in": "100 100", "out": "100 * 100 = 10000"}, {"in": "7 0", "out": "7 * 0 = 0"}, {"in": "-3 4", "out": "-3 * 4 = -12"}], "solution": "a, b = map(int, input().split())\nprint(a, \"*\", b, \"=\", a * b)", "hint": "한 줄에 두 수 → input().split()으로 나누고 map(int, ...)으로 정수 변환. int(input())을 쓰면 '10 20' 전체를 바꾸려다 ValueError.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9192", "chapter": "변수와 입력", "title": "변수와 입력 - 연습문제 6", "desc": "이름, 키, 몸무게를 입력받아 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 이름에 해당하는 길이 10 이하의 문자열, 키에 해당하는 1 이상 200 이하의 정수, 몸무게에 해당하는 1 이상 200 이하의 실수가 주어진다.", "output": "출력 예를 참고한다.", "examples": [{"in": "Park 189 82.3", "out": "name: Park\nheight: 189\nweight: 82.3"}], "tests": [{"in": "Park 189 82.3", "out": "name: Park\nheight: 189\nweight: 82.3"}, {"in": "Kim 170 60.5", "out": "name: Kim\nheight: 170\nweight: 60.5"}, {"in": "Lee 155 48.25", "out": "name: Lee\nheight: 155\nweight: 48.25"}, {"in": "Choi 200 99.9", "out": "name: Choi\nheight: 200\nweight: 99.9"}, {"in": "Jo 1 1.5", "out": "name: Jo\nheight: 1\nweight: 1.5"}], "solution": "name, height, weight = input().split()\nheight = int(height)\nweight = float(weight)\nprint(\"name:\", name)\nprint(\"height:\", height)\nprint(\"weight:\", weight)", "hint": "세 값을 split()으로 나눈 뒤 키는 int(), 몸무게는 float()로 바꾼다. 출력은 세 줄.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9201", "chapter": "연산자", "title": "연산자 - 연습문제 1", "desc": "두 개의 정수를 입력 받아 다음과 같이 출력하는 프로그램을 작성하시오.", "input": "두 줄에 걸쳐 한 줄에 하나의 정수가 주어진다. 각 정수는 10 이하의 양의 정수이다.", "examples": [{"in": "5\n2", "out": "5 + 2 = 7\n5 - 2 = 3\n5 * 2 = 10\n5 / 2 = 2.5\n5 // 2 = 2\n5 % 2 = 1\n5 ** 2 = 25"}], "tests": [{"in": "5\n2", "out": "5 + 2 = 7\n5 - 2 = 3\n5 * 2 = 10\n5 / 2 = 2.5\n5 // 2 = 2\n5 % 2 = 1\n5 ** 2 = 25"}, {"in": "10\n3", "out": "10 + 3 = 13\n10 - 3 = 7\n10 * 3 = 30\n10 / 3 = 3.3333333333333335\n10 // 3 = 3\n10 % 3 = 1\n10 ** 3 = 1000"}, {"in": "1\n1", "out": "1 + 1 = 2\n1 - 1 = 0\n1 * 1 = 1\n1 / 1 = 1.0\n1 // 1 = 1\n1 % 1 = 0\n1 ** 1 = 1"}, {"in": "8\n2", "out": "8 + 2 = 10\n8 - 2 = 6\n8 * 2 = 16\n8 / 2 = 4.0\n8 // 2 = 4\n8 % 2 = 0\n8 ** 2 = 64"}, {"in": "9\n4", "out": "9 + 4 = 13\n9 - 4 = 5\n9 * 4 = 36\n9 / 4 = 2.25\n9 // 4 = 2\n9 % 4 = 1\n9 ** 4 = 6561"}, {"in": "3\n10", "out": "3 + 10 = 13\n3 - 10 = -7\n3 * 10 = 30\n3 / 10 = 0.3\n3 // 10 = 0\n3 % 10 = 3\n3 ** 10 = 59049"}], "solution": "a = int(input())\nb = int(input())\nprint(a, \"+\", b, \"=\", a + b)\nprint(a, \"-\", b, \"=\", a - b)\nprint(a, \"*\", b, \"=\", a * b)\nprint(a, \"/\", b, \"=\", a / b)\nprint(a, \"//\", b, \"=\", a // b)\nprint(a, \"%\", b, \"=\", a % b)\nprint(a, \"**\", b, \"=\", a ** b)", "hint": "정수끼리 나눗셈(/)은 항상 실수 결과다. 8 / 2 = 4.0 처럼 나온다.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9204", "chapter": "연산자", "title": "연산자 - 연습문제 2", "desc": "7 개의 정수를 입력 받아 각각의 수에 +2, -2, *2, /2, //2, %2, **2의 연산을 실행하여 그 값을 저장한 후 차례대로 출력하는 프로그램을 작성하시오.", "input": "일곱 줄에 걸쳐 한 줄에 하나의 정수가 주어진다. 각 값은 1 이상 100 이하의 정수이다.", "output": "첫 줄에 각 줄에 입력받은 수들에 순서로 +2, -2, *2, /2, //2, %2, **2 연산을 적용한 값을 공백으로 구분하여 출력한다.", "examples": [{"in": "2\n3\n4\n5\n6\n7\n8", "out": "4 1 8 2.5 3 1 64"}], "tests": [{"in": "2\n3\n4\n5\n6\n7\n8", "out": "4 1 8 2.5 3 1 64"}, {"in": "10\n1\n50\n7\n99\n100\n13", "out": "12 -1 100 3.5 49 0 169"}, {"in": "1\n1\n1\n1\n1\n1\n1", "out": "3 -1 2 0.5 0 1 1"}, {"in": "100\n100\n100\n100\n100\n100\n100", "out": "102 98 200 50.0 50 0 10000"}], "solution": "a = int(input())\nb = int(input())\nc = int(input())\nd = int(input())\ne = int(input())\nf = int(input())\ng = int(input())\na += 2\nb -= 2\nc *= 2\nd /= 2\ne //= 2\nf %= 2\ng **= 2\nprint(a, b, c, d, e, f, g)", "hint": "복합 대입 연산자(+=, -=, *=, /=, //=, %=, **=)를 쓰면 '계산 후 저장'을 한 번에 한다. d /= 2는 실수가 된다.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9208", "chapter": "연산자", "title": "연산자 - 연습문제 3", "desc": "세 개의 정수 N, A, B를 입력받아 N을 A와 B와 각각 비교하여 같으면 True, 다르면 False를 출력하고, 이어서 다르면 True, 같으면 False를 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다.\n두 번째 줄에 정수 A, B가 공백으로 구분되어 주어진다.\n모든 값은 1 이상 100 이하의 정수이다.", "output": "첫 번째 줄에\nN과 A가 같으면 True 아니면 False,\nN과 B가 같으면 True 아니면 False,\nN과 A가 다르면 True 같으면 False,\nN과 B가 다르면 True 같으면 False\n를 공백으로 구분하여 출력한다.", "examples": [{"in": "2\n2 3", "out": "True False False True"}], "tests": [{"in": "2\n2 3", "out": "True False False True"}, {"in": "5\n5 5", "out": "True True False False"}, {"in": "7\n1 7", "out": "False True True False"}, {"in": "10\n3 4", "out": "False False True True"}, {"in": "100\n100 1", "out": "True False False True"}], "solution": "N = int(input())\nA, B = map(int, input().split())\nprint(N == A, N == B, N != A, N != B)", "hint": "비교 연산자(==, !=)의 결과는 True/False 값이다. 그대로 print하면 된다.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9210", "chapter": "연산자", "title": "연산자 - 연습문제 4", "desc": "3개의 정수 a, b, c를 입력받아서 a가 b보다 큰지, b가 c보다 크거나 같은지, a가 b보다 작거나 같은지, b가 c보다 작은지를 비교하여 참이면 True, 거짓이면 False을 각각 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 a, b, c가 공백으로 구분되어 주어진다. (1 ≤ a, b, c ≤ 100)", "examples": [{"in": "1 2 2", "out": "False True True False"}], "tests": [{"in": "1 2 2", "out": "False True True False"}, {"in": "3 2 1", "out": "True True False False"}, {"in": "5 5 5", "out": "False True True False"}, {"in": "10 20 30", "out": "False False True True"}, {"in": "100 1 50", "out": "True False False True"}, {"in": "7 7 8", "out": "False False True True"}], "solution": "a, b, c = map(int, input().split())\nprint(a > b, b >= c, a <= b, b < c)", "hint": "문자열 상태로 비교하면 '10' < '9'가 True가 되는 등 결과가 달라진다. 반드시 int로 바꾼 뒤 비교.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9212", "chapter": "연산자", "title": "연산자 - 연습문제 5", "desc": "세 개의 변수 A, B, C를 선언하여 각각 True, False, True로 초기화한 후 A와 B가 모두 참인지, B 또는 C가 참인지, B가 거짓인지 확인하여 거짓이면 True, 참이면 False를 각각 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "False True True"}], "tests": [{"in": "", "out": "False True True"}], "solution": "A = True\nB = False\nC = True\nprint(A and B, B or C, not B)", "hint": "‘모두 참’ = and, ‘또는’ = or, ‘거짓이면 True’ = not.", "checks": [{"type": "vars", "names": ["A", "B", "C"], "hard": false, "msg": "변수 A, B, C에 값을 대입하는 줄이 없음"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9214", "chapter": "연산자", "title": "연산자 - 연습문제 6", "desc": "세 개의 정수 a, b, c를 선언하여 각각 0, 1, 2로 초기화한 후 아래와 같은 다양한 논리 연산 결과를 출력하는 프로그램을 작성하시오.\n1. a < b and a < c\n2. a < b < c\n3. (a==b or a==c) and (a or b)\n4. a or not c\n5. a != b and b != c\n\n* 출력 예의 \"???\"로 표시된 부분은 여러분들의 연습을 위해 남겨 두었다. 직접 계산한 결과와 프로그램의 계산 결과가 일치하는지 확인해보자.", "examples": [{"in": "", "out": "True True ??? ??? ???", "show": true}], "tests": [{"in": "", "out": "True True False False True"}], "solution": "a = 0\nb = 1\nc = 2\nprint(a < b and a < c, a < b < c, (a == b or a == c) and (a or b), a or not c, a != b and b != c)", "hint": "3번: 괄호 안 (a==b or a==c)가 False면 and 뒤는 보지 않고 False. 4번: a가 0(거짓)이라 not c의 값이 결과. 직접 계산해 본 뒤 실행으로 확인.", "hideExpected": true, "note": "??? 부분이 공개되지 않도록, 틀렸을 때 정답 대신 ‘몇 번째 값이 다른지’만 알려줌.", "input": "", "output": "", "checks": []}, {"id": "9223", "chapter": "선택제어문", "title": "선택제어문 - 연습문제 1", "desc": "정수 N을 입력받아 N이 10보다 크면 \"Big\"이라고 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (1 ≤ N ≤ 20)", "examples": [{"in": "20", "out": "Big"}, {"in": "5", "out": "(해당 경우 아무 것도 출력하지 않는다)", "show": true}], "tests": [{"in": "20", "out": "Big"}, {"in": "5", "out": ""}, {"in": "10", "out": ""}, {"in": "11", "out": "Big"}, {"in": "1", "out": ""}], "solution": "N = int(input())\nif N > 10:\n    print(\"Big\")", "hint": "10보다 ‘크면’이므로 N > 10. N이 10일 때는 아무것도 출력하지 않아야 한다.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9226", "chapter": "선택제어문", "title": "선택제어문 - 연습문제 2", "desc": "두 정수 a, b를 입력받아 두 수를 출력하는 프로그램을 작성하시오. 단, 만약 a가 b보다 크다면 두 수를 바꾸어야 한다.", "input": "첫 줄에 두 정수 a, b가 주어진다. (1 ≤ a, b ≤ 100)", "examples": [{"in": "14 13", "out": "13\n14"}], "tests": [{"in": "14 13", "out": "13\n14"}, {"in": "3 8", "out": "3\n8"}, {"in": "5 5", "out": "5\n5"}, {"in": "100 1", "out": "1\n100"}, {"in": "1 100", "out": "1\n100"}], "solution": "a, b = map(int, input().split())\nif a > b:\n    a, b = b, a\nprint(a)\nprint(b)", "hint": "파이썬에서는 a, b = b, a 한 줄로 두 값을 바꿀 수 있다. 출력은 한 줄에 하나씩.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9228", "chapter": "선택제어문", "title": "선택제어문 - 연습문제 3", "desc": "점수를 입력받아서 60점 이상이면 \"PASS\" 그렇지 않으면 \"FAIL\"을 다음과 같이 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 점수가 주어진다. 점수는 0 이상 100 이하의 정수이다.", "examples": [{"in": "58", "out": "FAIL"}, {"in": "89", "out": "PASS"}], "tests": [{"in": "58", "out": "FAIL"}, {"in": "89", "out": "PASS"}, {"in": "60", "out": "PASS"}, {"in": "59", "out": "FAIL"}, {"in": "0", "out": "FAIL"}, {"in": "100", "out": "PASS"}], "solution": "score = int(input())\nif score >= 60:\n    print(\"PASS\")\nelse:\n    print(\"FAIL\")", "hint": "‘이상’은 >=. 60점 경계값을 꼭 직접 넣어 확인.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9231", "chapter": "선택제어문", "title": "선택제어문 - 연습문제 4", "desc": "점수를 입력 받아 점수에 따라 \"A B C D F학점\"으로 평가하는 프로그램을 작성하시오.", "input": "첫 줄에 점수가 주어진다. 점수는 0 이상 100 이하의 정수다.", "output": "첫 줄에 점수에 해당하는 학점을 출력한다.\n90~100: A\n80~89: B\n70~79: C\n60~69: D\n0~59: F", "examples": [{"in": "89", "out": "B"}, {"in": "100", "out": "A"}], "tests": [{"in": "89", "out": "B"}, {"in": "100", "out": "A"}, {"in": "90", "out": "A"}, {"in": "80", "out": "B"}, {"in": "79", "out": "C"}, {"in": "70", "out": "C"}, {"in": "69", "out": "D"}, {"in": "60", "out": "D"}, {"in": "59", "out": "F"}, {"in": "0", "out": "F"}], "solution": "N = int(input())\nif N >= 90:\n    print(\"A\")\nelif N >= 80:\n    print(\"B\")\nelif N >= 70:\n    print(\"C\")\nelif N >= 60:\n    print(\"D\")\nelse:\n    print(\"F\")", "hint": "if-elif는 위에서부터 처음 참인 조건 하나만 실행한다. 큰 점수부터 검사하면 아래 조건에 범위 상한을 안 써도 된다.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9233", "chapter": "선택제어문", "title": "선택제어문 - 연습문제 5", "desc": "주사위를 두 번 던져서 나온 수가 모두 3 이상이면 \"High\"를 출력하고, 한 개만 3 이상이면 \"Mid\"를, 모두 3 미만이면 \"Low\"라고 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 첫 번째 주사위의 수가 주어진다.\n두 번째 줄에 두 번째 주사위의 수가 주어진다.\n모든 값은 1 이상 6 이하의 정수다.", "examples": [{"in": "5\n2", "out": "Mid"}, {"in": "3\n3", "out": "High"}], "tests": [{"in": "5\n2", "out": "Mid"}, {"in": "3\n3", "out": "High"}, {"in": "1\n2", "out": "Low"}, {"in": "2\n6", "out": "Mid"}, {"in": "6\n6", "out": "High"}, {"in": "2\n2", "out": "Low"}, {"in": "3\n1", "out": "Mid"}], "solution": "a = int(input())\nb = int(input())\nif a >= 3 and b >= 3:\n    print(\"High\")\nelif a >= 3 or b >= 3:\n    print(\"Mid\")\nelse:\n    print(\"Low\")", "hint": "‘모두’ = and, ‘하나라도’ = or. High를 먼저 검사하면 elif에서는 or만 써도 ‘한 개만’이 된다.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9235", "chapter": "선택제어문", "title": "선택제어문 - 연습문제 6", "desc": "세 개의 정수 중 가장 큰 수를 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 -100 이상 100 이하의 세 개의 정수가 주어진다.", "examples": [{"in": "40 10 50", "out": "MAX: 50"}], "tests": [{"in": "40 10 50", "out": "MAX: 50"}, {"in": "-1 -2 -3", "out": "MAX: -1"}, {"in": "5 5 5", "out": "MAX: 5"}, {"in": "100 -100 0", "out": "MAX: 100"}, {"in": "7 9 8", "out": "MAX: 9"}, {"in": "-100 -100 -99", "out": "MAX: -99"}, {"in": "9 3 9", "out": "MAX: 9"}], "solution": "a, b, c = map(int, input().split())\nmx = a\nif b > mx:\n    mx = b\nif c > mx:\n    mx = c\nprint(\"MAX:\", mx)", "hint": "출력 형식은 'MAX: 50'. 첫 값을 최댓값으로 두고 나머지와 하나씩 비교하면 같은 값이 있어도 안전하다.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9238", "chapter": "선택제어문", "title": "선택제어문 - 연습문제 7", "desc": "두 개의 정수를 입력받아 삼항 연산자를 이용하여 두 수 중 큰 수를 출력하는 프로그램을 작성하시오.\n\n(*Warning: 삼항 연산자를 사용하지 않을 경우 오답처리 됩니다.)", "input": "첫 번째 줄에 정수가 하나 주어진다.\n두 번째 줄에 정수가 하나 주어진다.\n모든 값은 1 이상 100 이하의 정수다.", "examples": [{"in": "50\n35", "out": "50"}], "tests": [{"in": "50\n35", "out": "50"}, {"in": "35\n50", "out": "50"}, {"in": "7\n7", "out": "7"}, {"in": "1\n100", "out": "100"}, {"in": "100\n99", "out": "100"}], "solution": "a = int(input())\nb = int(input())\nlarge = a if a > b else b\nprint(large)", "hint": "삼항 연산자 형식: 값1 if 조건식 else 값2", "checks": [{"type": "ifexp", "hard": true, "msg": "삼항 연산자(값1 if 조건 else 값2)를 사용하지 않음 → 문제 조건 위반"}], "output": "", "hideExpected": false, "note": ""}, {"id": "9256", "chapter": "반복제어문 1", "title": "반복제어문1 - 연습문제 1", "desc": "1부터 100까지의 수를 모두 출력하는 프로그램을 작성하시오.", "output": "첫 줄에 1부터 100까지의 수를 모두 출력한다.", "examples": [{"in": "", "out": "1 2 3 ... 98 99 100", "show": true}], "tests": [{"in": "", "out": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100"}], "solution": "i = 1\nwhile i <= 100:\n    print(i, end=\" \")\n    i += 1", "hint": "한 줄에 이어서 출력하려면 print(i, end=\" \"). 반복 변수를 1씩 늘리는 줄을 빠뜨리면 무한 루프.", "input": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9261", "chapter": "반복제어문 1", "title": "반복제어문1 - 연습문제 2", "desc": "1부터 정수 N까지의 수를 모두 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (1 ≤ N ≤ 100)", "output": "첫 줄에 1부터 정수 N까지의 수를 모두 출력한다.", "examples": [{"in": "10", "out": "1 2 3 4 5 6 7 8 9 10"}], "tests": [{"in": "10", "out": "1 2 3 4 5 6 7 8 9 10"}, {"in": "1", "out": "1"}, {"in": "5", "out": "1 2 3 4 5"}, {"in": "100", "out": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100"}, {"in": "37", "out": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37"}], "solution": "N = int(input())\ni = 1\nwhile i <= N:\n    print(i, end=\" \")\n    i += 1", "hint": "조건을 i < N으로 쓰면 N이 빠진다. i <= N.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9267", "chapter": "반복제어문 1", "title": "반복제어문1 - 연습문제 3", "desc": "정수 N을 입력받아 정수 N부터 1까지의 모든 정수를 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (1 ≤ N ≤ 100)", "output": "첫 줄에 정수 N부터 1까지의 모든 정수를 출력한다.", "examples": [{"in": "5", "out": "5 4 3 2 1"}], "tests": [{"in": "5", "out": "5 4 3 2 1"}, {"in": "1", "out": "1"}, {"in": "10", "out": "10 9 8 7 6 5 4 3 2 1"}, {"in": "100", "out": "100 99 98 97 96 95 94 93 92 91 90 89 88 87 86 85 84 83 82 81 80 79 78 77 76 75 74 73 72 71 70 69 68 67 66 65 64 63 62 61 60 59 58 57 56 55 54 53 52 51 50 49 48 47 46 45 44 43 42 41 40 39 38 37 36 35 34 33 32 31 30 29 28 27 26 25 24 23 22 21 20 19 18 17 16 15 14 13 12 11 10 9 8 7 6 5 4 3 2 1"}], "solution": "N = int(input())\ni = N\nwhile i >= 1:\n    print(i, end=\" \")\n    i -= 1", "hint": "N에서 시작해 1씩 줄인다. 조건은 i >= 1.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9270", "chapter": "반복제어문 1", "title": "반복제어문1 - 연습문제 4", "desc": "정수 S와 정수 E를 입력받아 정수 S부터 정수 E까지의 모든 정수를 출력하는 프로그램을 작성하시오. (S ≤ E)", "input": "첫 줄에 정수 S와 E가 주어진다. (1 ≤ S ≤ E ≤ 100)", "output": "첫 줄에 정수 S부터 정수 E까지의 모든 정수를 출력한다.", "examples": [{"in": "1 5", "out": "1 2 3 4 5"}], "tests": [{"in": "1 5", "out": "1 2 3 4 5"}, {"in": "3 3", "out": "3"}, {"in": "1 100", "out": "1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99 100"}, {"in": "50 60", "out": "50 51 52 53 54 55 56 57 58 59 60"}, {"in": "99 100", "out": "99 100"}], "solution": "S, E = map(int, input().split())\ni = S\nwhile i <= E:\n    print(i, end=\" \")\n    i += 1", "hint": "S == E인 경우(한 개만 출력)도 확인.", "checks": [], "hideExpected": false, "note": ""}, {"id": "9273", "chapter": "반복제어문 1", "title": "반복제어문1 - 연습문제 5", "desc": "while문을 이용하여 1부터 정수 10까지의 합 구해 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "55"}], "tests": [{"in": "", "out": "55"}], "solution": "hap = 0\ni = 1\nwhile i <= 10:\n    hap += i\n    i += 1\nprint(hap)", "hint": "합계 변수를 반복문 ‘밖’에서 0으로 시작. print도 반복문 밖(들여쓰기 없이)에 있어야 55 한 번만 나온다.", "checks": [{"type": "while", "hard": true, "msg": "while문을 사용하지 않음 → 문제 조건 위반"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9275", "chapter": "반복제어문 1", "title": "반복제어문1 - 연습문제 6", "desc": "정수를 계속 입력받아 출력하다가 0이 입력되면 종료하는 프로그램을 작성하시오.", "input": "여러 줄에 걸쳐 정수가 하나씩 주어진다.\n각 값은 -100 이상 100 이하의 정수다.\n마지막 줄은 0이다.", "examples": [{"in": "4\n6\n0", "out": "N = 4\nN = 6"}], "tests": [{"in": "4\n6\n0", "out": "N = 4\nN = 6"}, {"in": "0", "out": ""}, {"in": "-5\n100\n-100\n0", "out": "N = -5\nN = 100\nN = -100"}, {"in": "1\n2\n3\n4\n5\n0", "out": "N = 1\nN = 2\nN = 3\nN = 4\nN = 5"}, {"in": "7\n0", "out": "N = 7"}], "solution": "while True:\n    N = int(input())\n    if N == 0:\n        break\n    print(\"N =\", N)", "hint": "while True: 로 무한 반복하고, 0이 들어오면 break. 0은 출력하지 않는다(검사 후 출력 순서).", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9279", "chapter": "반복제어문 1", "title": "반복제어문1 - 연습문제 7", "desc": "1부터 500까지의 정수들 중 3의 배수를 제외한 모든 정수를 출력하는 프로그램을 작성하시오. 단, continue를 사용한다.", "examples": [{"in": "", "out": "1 2 4 ... 497 499 500", "show": true}], "tests": [{"in": "", "out": "1 2 4 5 7 8 10 11 13 14 16 17 19 20 22 23 25 26 28 29 31 32 34 35 37 38 40 41 43 44 46 47 49 50 52 53 55 56 58 59 61 62 64 65 67 68 70 71 73 74 76 77 79 80 82 83 85 86 88 89 91 92 94 95 97 98 100 101 103 104 106 107 109 110 112 113 115 116 118 119 121 122 124 125 127 128 130 131 133 134 136 137 139 140 142 143 145 146 148 149 151 152 154 155 157 158 160 161 163 164 166 167 169 170 172 173 175 176 178 179 181 182 184 185 187 188 190 191 193 194 196 197 199 200 202 203 205 206 208 209 211 212 214 215 217 218 220 221 223 224 226 227 229 230 232 233 235 236 238 239 241 242 244 245 247 248 250 251 253 254 256 257 259 260 262 263 265 266 268 269 271 272 274 275 277 278 280 281 283 284 286 287 289 290 292 293 295 296 298 299 301 302 304 305 307 308 310 311 313 314 316 317 319 320 322 323 325 326 328 329 331 332 334 335 337 338 340 341 343 344 346 347 349 350 352 353 355 356 358 359 361 362 364 365 367 368 370 371 373 374 376 377 379 380 382 383 385 386 388 389 391 392 394 395 397 398 400 401 403 404 406 407 409 410 412 413 415 416 418 419 421 422 424 425 427 428 430 431 433 434 436 437 439 440 442 443 445 446 448 449 451 452 454 455 457 458 460 461 463 464 466 467 469 470 472 473 475 476 478 479 481 482 484 485 487 488 490 491 493 494 496 497 499 500"}], "solution": "i = 0\nwhile i < 500:\n    i += 1\n    if i % 3 == 0:\n        continue\n    print(i, end=\" \")", "hint": "while에서 continue를 쓰면 아래 줄을 건너뛴다. 증가(i += 1)가 continue보다 아래에 있으면 3에서 영원히 멈춘다(무한 루프) → 증가를 위로 올리거나 continue 전에도 증가.", "checks": [{"type": "continue", "hard": true, "msg": "continue를 사용하지 않음 → 문제 조건 위반"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9290", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 1", "desc": "Python이라는 단어와 함께 0부터 N-1까지의 정수를 한 줄에 하나 씩 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (1 ≤ N ≤ 100)", "examples": [{"in": "3", "out": "Python 0\nPython 1\nPython 2"}], "tests": [{"in": "3", "out": "Python 0\nPython 1\nPython 2"}, {"in": "1", "out": "Python 0"}, {"in": "5", "out": "Python 0\nPython 1\nPython 2\nPython 3\nPython 4"}, {"in": "10", "out": "Python 0\nPython 1\nPython 2\nPython 3\nPython 4\nPython 5\nPython 6\nPython 7\nPython 8\nPython 9"}, {"in": "100", "out": "Python 0\nPython 1\nPython 2\nPython 3\nPython 4\nPython 5\nPython 6\nPython 7\nPython 8\nPython 9\nPython 10\nPython 11\nPython 12\nPython 13\nPython 14\nPython 15\nPython 16\nPython 17\nPython 18\nPython 19\nPython 20\nPython 21\nPython 22\nPython 23\nPython 24\nPython 25\nPython 26\nPython 27\nPython 28\nPython 29\nPython 30\nPython 31\nPython 32\nPython 33\nPython 34\nPython 35\nPython 36\nPython 37\nPython 38\nPython 39\nPython 40\nPython 41\nPython 42\nPython 43\nPython 44\nPython 45\nPython 46\nPython 47\nPython 48\nPython 49\nPython 50\nPython 51\nPython 52\nPython 53\nPython 54\nPython 55\nPython 56\nPython 57\nPython 58\nPython 59\nPython 60\nPython 61\nPython 62\nPython 63\nPython 64\nPython 65\nPython 66\nPython 67\nPython 68\nPython 69\nPython 70\nPython 71\nPython 72\nPython 73\nPython 74\nPython 75\nPython 76\nPython 77\nPython 78\nPython 79\nPython 80\nPython 81\nPython 82\nPython 83\nPython 84\nPython 85\nPython 86\nPython 87\nPython 88\nPython 89\nPython 90\nPython 91\nPython 92\nPython 93\nPython 94\nPython 95\nPython 96\nPython 97\nPython 98\nPython 99"}], "solution": "N = int(input())\nfor i in range(N):\n    print(\"Python\", i)", "hint": "range(N)은 0부터 N-1까지.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9294", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 2", "desc": "3부터 99까지의 정수를 모두 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "3 4 ... 98 99", "show": true}], "tests": [{"in": "", "out": "3 4 5 6 7 8 9 10 11 12 13 14 15 16 17 18 19 20 21 22 23 24 25 26 27 28 29 30 31 32 33 34 35 36 37 38 39 40 41 42 43 44 45 46 47 48 49 50 51 52 53 54 55 56 57 58 59 60 61 62 63 64 65 66 67 68 69 70 71 72 73 74 75 76 77 78 79 80 81 82 83 84 85 86 87 88 89 90 91 92 93 94 95 96 97 98 99"}], "solution": "for i in range(3, 100):\n    print(i, end=\" \")", "hint": "range(a, b)는 b를 포함하지 않는다. 99까지면 range(3, 100).", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9296", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 3", "desc": "5 부터 55 까지 2씩 증가하며 나오는 모든 정수를 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "5 7 ... 53 55", "show": true}], "tests": [{"in": "", "out": "5 7 9 11 13 15 17 19 21 23 25 27 29 31 33 35 37 39 41 43 45 47 49 51 53 55"}], "solution": "for i in range(5, 56, 2):\n    print(i, end=\" \")", "hint": "range(시작, 끝, 증가량). 55를 포함하려면 끝 값은 56(또는 57).", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9299", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 4", "desc": "99부터 3까지 2씩 감소하며 나오는 모든 정수를 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "99 97 ... 5 3", "show": true}], "tests": [{"in": "", "out": "99 97 95 93 91 89 87 85 83 81 79 77 75 73 71 69 67 65 63 61 59 57 55 53 51 49 47 45 43 41 39 37 35 33 31 29 27 25 23 21 19 17 15 13 11 9 7 5 3"}], "solution": "for i in range(99, 2, -2):\n    print(i, end=\" \")", "hint": "감소할 때는 증가량을 음수로: range(99, 2, -2). 끝 값 2는 포함되지 않으므로 3에서 멈춘다.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9302", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 5", "desc": "정수 N을 입력받아 1에서 입력받은 정수 N까지의 합을 구하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (1 ≤ N ≤ 100)", "examples": [{"in": "10", "out": "55"}], "tests": [{"in": "10", "out": "55"}, {"in": "1", "out": "1"}, {"in": "100", "out": "5050"}, {"in": "50", "out": "1275"}, {"in": "7", "out": "28"}], "solution": "N = int(input())\ntotal = 0\nfor i in range(1, N + 1):\n    total += i\nprint(total)", "hint": "sum이라는 이름은 파이썬 내장 함수 이름이라 변수명으로는 피하는 게 좋다(total, hap 등).", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "7102", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 6", "desc": "정수 N을 입력받은 후, 다음 줄부터 N개의 정수를 입력받아 홀수의 합계와 짝수의 개수를 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (1 ≤ N ≤ 10)\n두 번째 줄부터 N줄에 걸쳐 양의 정수가 하나씩 주어진다.", "examples": [{"in": "5\n3\n5\n9\n2\n8", "out": "17 2"}], "tests": [{"in": "5\n3\n5\n9\n2\n8", "out": "17 2"}, {"in": "1\n2", "out": "0 1"}, {"in": "3\n1\n3\n5", "out": "9 0"}, {"in": "10\n1\n2\n3\n4\n5\n6\n7\n8\n9\n10", "out": "25 5"}, {"in": "4\n100\n200\n2\n8", "out": "0 4"}], "solution": "N = int(input())\noddsum = 0\nevencnt = 0\nfor i in range(N):\n    num = int(input())\n    if num % 2 == 1:\n        oddsum += num\n    else:\n        evencnt += 1\nprint(oddsum, evencnt)", "hint": "홀수: num % 2 == 1 → 합계에 더하기, 짝수 → 개수 +1. 입력은 반복문 안에서 받는다.", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9307", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 7", "desc": "출력 예와 같이 3 × 3 크기의 행렬를 두 번 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "1 1 1\n2 2 2\n3 3 3\n\n1 2 3\n1 2 3\n1 2 3"}], "tests": [{"in": "", "out": "1 1 1\n2 2 2\n3 3 3\n\n1 2 3\n1 2 3\n1 2 3"}], "solution": "for i in range(1, 4):\n    for j in range(1, 4):\n        print(i, end=\" \")\n    print()\nprint()\nfor i in range(1, 4):\n    for j in range(1, 4):\n        print(j, end=\" \")\n    print()", "hint": "첫 번째는 바깥 변수 i를, 두 번째는 안쪽 변수 j를 출력. 가운데 빈 줄은 print() 하나.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9312", "chapter": "반복제어문 2", "title": "반복제어문2 - 연습문제 8", "desc": "아래와 같이 5단부터 7단까지 구구단을 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "5 * 1 = 5   6 * 1 = 6   7 * 1 = 7\n5 * 2 = 10   6 * 2 = 12   7 * 2 = 14\n5 * 3 = 15   6 * 3 = 18   7 * 3 = 21\n5 * 4 = 20   6 * 4 = 24   7 * 4 = 28\n5 * 5 = 25   6 * 5 = 30   7 * 5 = 35\n5 * 6 = 30   6 * 6 = 36   7 * 6 = 42\n5 * 7 = 35   6 * 7 = 42   7 * 7 = 49\n5 * 8 = 40   6 * 8 = 48   7 * 8 = 56\n5 * 9 = 45   6 * 9 = 54   7 * 9 = 63"}], "tests": [{"in": "", "out": "5 * 1 = 5   6 * 1 = 6   7 * 1 = 7\n5 * 2 = 10   6 * 2 = 12   7 * 2 = 14\n5 * 3 = 15   6 * 3 = 18   7 * 3 = 21\n5 * 4 = 20   6 * 4 = 24   7 * 4 = 28\n5 * 5 = 25   6 * 5 = 30   7 * 5 = 35\n5 * 6 = 30   6 * 6 = 36   7 * 6 = 42\n5 * 7 = 35   6 * 7 = 42   7 * 7 = 49\n5 * 8 = 40   6 * 8 = 48   7 * 8 = 56\n5 * 9 = 45   6 * 9 = 54   7 * 9 = 63"}], "solution": "for i in range(1, 10):\n    for j in range(5, 8):\n        print(j, \"*\", i, \"=\", j * i, end=\"   \")\n    print()", "hint": "한 줄에 5단·6단·7단이 같이 있으므로 바깥 반복은 곱하는 수(1~9), 안쪽 반복은 단(5~7). 칸 사이는 공백 3칸(정올 화면을 확대해서 확인함).", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9324", "chapter": "반복제어문 3", "title": "반복제어문3 - 연습문제 1", "desc": "출력 예와 같이 출력하는 프로그램을 for문을 이용하여 작성하시오.", "examples": [{"in": "", "out": "*\n**\n***"}], "tests": [{"in": "", "out": "*\n**\n***"}], "solution": "for i in range(1, 4):\n    for j in range(i):\n        print(\"*\", end=\"\")\n    print()", "hint": "i번째 줄에 별 i개. 문자열 곱셈 \"*\" * i 도 가능.", "checks": [{"type": "for", "hard": true, "msg": "for문을 사용하지 않음 → 문제 조건 위반"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9327", "chapter": "반복제어문 3", "title": "반복제어문3 - 연습문제 2", "desc": "출력 예와 같이 출력하는 프로그램을 for문을 이용하여 작성하시오.", "examples": [{"in": "", "out": "***\n**\n*\n**\n***"}], "tests": [{"in": "", "out": "***\n**\n*\n**\n***"}], "solution": "for i in range(3, 0, -1):\n    print(\"*\" * i)\nfor i in range(2, 4):\n    print(\"*\" * i)", "hint": "줄어드는 부분(3,2,1)과 늘어나는 부분(2,3)을 반복문 두 개로 나눈다. 가운데 * 한 줄이 두 번 나오지 않게 주의.", "checks": [{"type": "for", "hard": true, "msg": "for문을 사용하지 않음 → 문제 조건 위반"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9329", "chapter": "반복제어문 3", "title": "반복제어문3 - 연습문제 3", "desc": "출력 예와 같이 출력하는 프로그램을 for문을 이용하여 작성하시오.", "examples": [{"in": "", "out": "  *\n **\n***"}], "tests": [{"in": "", "out": "  *\n **\n***"}], "solution": "for i in range(1, 4):\n    for j in range(3 - i):\n        print(\" \", end=\"\")\n    for j in range(i):\n        print(\"*\", end=\"\")\n    print()", "hint": "i번째 줄: 공백 (3 - i)개 + 별 i개. 앞 공백은 채점에서 무시되지 않는다.", "checks": [{"type": "for", "hard": true, "msg": "for문을 사용하지 않음 → 문제 조건 위반"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9331", "chapter": "반복제어문 3", "title": "반복제어문3 - 연습문제 4", "desc": "출력 예와 같이 출력하는 프로그램을 for문을 이용하여 작성하시오.", "examples": [{"in": "", "out": "  *\n ***\n*****"}], "tests": [{"in": "", "out": "  *\n ***\n*****"}], "solution": "for i in range(1, 4):\n    for j in range(3 - i):\n        print(\" \", end=\"\")\n    for j in range(2 * i - 1):\n        print(\"*\", end=\"\")\n    print()", "hint": "별 개수가 1, 3, 5 → 2*i - 1. 공백은 3 - i.", "checks": [{"type": "for", "hard": true, "msg": "for문을 사용하지 않음 → 문제 조건 위반"}], "input": "", "output": "", "hideExpected": false, "note": ""}, {"id": "9334", "chapter": "반복제어문 3", "title": "반복제어문3 - 연습문제 5", "desc": "한 줄에 영문 알파벳 소문자 a부터 z까지 출력하는 프로그램을 작성하시오.", "examples": [{"in": "", "out": "a b c … (중략) … x y z", "show": true}], "tests": [{"in": "", "out": "a b c d e f g h i j k l m n o p q r s t u v w x y z"}], "solution": "for i in range(ord('a'), ord('z') + 1):\n    print(chr(i), end=\" \")", "hint": "ord('a')=97, ord('z')=122. chr()에는 숫자 변수(i)를 넣는다. chr(\"i\")처럼 따옴표를 붙이면 문자열이 들어가 TypeError.", "input": "", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9337", "chapter": "반복제어문 3", "title": "반복제어문3 - 연습문제 6", "desc": "정수 N을 입력받아 N줄만큼 출력 예와 같이 알파벳을 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (1 ≤ N ≤ 6)", "examples": [{"in": "3", "out": "A\nBC\nDEF"}], "tests": [{"in": "3", "out": "A\nBC\nDEF"}, {"in": "1", "out": "A"}, {"in": "2", "out": "A\nBC"}, {"in": "4", "out": "A\nBC\nDEF\nGHIJ"}, {"in": "6", "out": "A\nBC\nDEF\nGHIJ\nKLMNO\nPQRSTU"}], "solution": "C = ord('A')\nN = int(input())\nfor i in range(1, N + 1):\n    for j in range(i):\n        print(chr(C), end=\"\")\n        C += 1\n    print()", "hint": "알파벳은 줄이 바뀌어도 이어진다 → 문자 코드 변수를 반복문 ‘밖’에서 시작하고 출력할 때마다 +1. 같은 줄 안에서는 공백 없이(end=\"\").", "output": "", "checks": [], "hideExpected": false, "note": ""}, {"id": "9339", "chapter": "반복제어문 3", "title": "반복제어문3 - 연습문제 7", "desc": "정수 N을 입력받아 정수 N줄만큼 출력 예와 같이 알파벳과 숫자를 출력하는 프로그램을 작성하시오.", "input": "첫 줄에 정수 N이 주어진다. (N ≤ 6)", "examples": [{"in": "4", "out": "A B C 1\nD E 2 3\nF 4 5 6\n7 8 9 10"}], "tests": [{"in": "4", "out": "A B C 1\nD E 2 3\nF 4 5 6\n7 8 9 10"}, {"in": "1", "out": "1"}, {"in": "2", "out": "A 1\n2 3"}, {"in": "3", "out": "A B 1\nC 2 3\n4 5 6"}, {"in": "5", "out": "A B C D 1\nE F G 2 3\nH I 4 5 6\nJ 7 8 9 10\n11 12 13 14 15"}, {"in": "6", "out": "A B C D E 1\nF G H I 2 3\nJ K L 4 5 6\nM N 7 8 9 10\nO 11 12 13 14 15\n16 17 18 19 20 21"}], "solution": "C = ord('A')\nm = 1\nN = int(input())\nfor i in range(1, N + 1):\n    for j in range(N - i):\n        print(chr(C), end=\" \")\n        C += 1\n    for j in range(i):\n        print(m, end=\" \")\n        m += 1\n    print()", "hint": "i번째 줄: 알파벳 (N - i)개, 숫자 i개. 알파벳 변수와 숫자 변수를 따로 두고 둘 다 줄이 바뀌어도 이어지게.", "output": "", "checks": [], "hideExpected": false, "note": ""}], "exams": [{"title": "1회", "items": [{"type": "mc", "no": 1, "cat": "기본", "pts": 3, "q": "print() 함수에 대한 설명으로 옳지 않은 것은?", "code": null, "bogi": null, "note": null, "opts": ["문자열은 큰따옴표(\" \")나 작은따옴표(' ')로 감싸서 출력한다.", "숫자를 따옴표로 감싸면 문자열로 인식한다.", "쉼표(,)로 여러 값을 출력하면 값 사이에 공백이 한 칸 들어간다.", "더하기(+)로 문자열을 이어 출력하면 값 사이에 공백이 한 칸 들어간다.", "`print(\"1\" \"2\")`의 실행 결과는 `12`이다."], "optsCode": false, "ans": 4, "exp": "+는 문자열을 공백 없이 그대로 이어 붙인다. print(\"파\"+\"이\"+\"썬\") → 파이썬, print(\"파\",\"이\",\"썬\") → 파 이 썬. ⑤ 따옴표 문자열을 나란히 쓰면 하나로 붙는다.", "topic": "print"}, {"type": "mc", "no": 2, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "print('a', 'b', 'c', sep='/')\nprint('My name is', end='-')\nprint('Jiho')", "bogi": null, "note": null, "opts": ["a/b/c\nMy name is-Jiho", "a b c\nMy name is-Jiho", "a/b/c\nMy name is\n-Jiho", "a/b/c/\nMy name is- Jiho", "abc/\nMy name is-\nJiho"], "optsCode": true, "ans": 1, "exp": "sep는 값과 값 ‘사이’에만 들어가므로 마지막 c 뒤에는 붙지 않는다. end='-'는 줄바꿈 대신 -를 출력하므로 다음 print가 같은 줄에 이어진다.", "topic": "sep/end"}, {"type": "mc", "no": 3, "cat": "기본", "pts": 3, "q": "다음 중 실행 결과가 나머지 넷과 <u>다른<\/u> 것은?", "code": null, "bogi": null, "note": null, "opts": ["print('3월 1일')", "print('{0}월 {1}일'.format(3, 1))", "print('%d월 %d일' % (3, 1))", "print('{1}월 {0}일'.format(3, 1))", "print(3, '월 ', 1, '일', sep='')"], "optsCode": true, "ans": 4, "exp": "format의 {0}, {1}은 괄호 안 값의 ‘순서 번호’다. ④는 {1}=1, {0}=3이 들어가 ‘1월 3일’. ⑤는 sep=''이라 값이 공백 없이 붙어 ‘3월 1일’.", "topic": "format/%"}, {"type": "mc", "no": 4, "cat": "기본", "pts": 3, "q": "<보기>에서 옳은 것만을 있는 대로 고른 것은?", "code": null, "bogi": ["ㄱ. input()으로 입력받은 값은 항상 문자열(str) 형태로 저장된다.", "ㄴ. 키보드로 7을 입력하면, a = input() 실행 후 a * 3의 값은 21이다.", "ㄷ. float('3')의 결과는 3.0이다.", "ㄹ. int('3.5')의 결과는 3이다."], "note": null, "opts": ["ㄱ", "ㄱ, ㄷ", "ㄴ, ㄹ", "ㄱ, ㄴ, ㄷ", "ㄱ, ㄷ, ㄹ"], "optsCode": false, "ans": 2, "exp": "ㄴ: input()은 문자열 '7'을 저장하므로 '7' * 3 = '777'. ㄹ: int()는 소수점이 있는 문자열을 바꾸지 못해 ValueError. ㄷ: float('3') = 3.0.", "topic": "input/자료형 변환"}, {"type": "mc", "no": 5, "cat": "기본", "pts": 3, "q": "한 줄에 공백으로 구분된 두 정수(예: 10 20)를 입력받아 두 수의 합(30)을 출력하는 코드로 옳은 것은?", "code": null, "bogi": null, "note": null, "opts": ["a = int(input())\nb = int(input())\nprint(a + b)", "a, b = input().split()\nprint(a + b)", "a, b = map(int, input().split())\nprint(a + b)", "a, b = int(input().split())\nprint(a + b)", "a, b = input().split()\na = int(a)\nprint(a + b)"], "optsCode": true, "ans": 3, "exp": "① '10 20' 전체를 int로 바꾸려다 ValueError. ② 문자열끼리 + → '1020'. ④ 리스트는 int()로 바꿀 수 없어 TypeError. ⑤ b가 문자열 그대로라 정수+문자열 TypeError(정리본 예시).", "topic": "split/map"}, {"type": "mc", "no": 6, "cat": "기본", "pts": 3, "q": "다음 코드를 실행했을 때 출력되는 수를 순서대로 나열한 것은?", "code": "'''\nprint(1)\n'''\nprint(2)  # print(3)\n# print(4)\nprint(5)", "bogi": null, "note": null, "opts": ["1, 2, 5", "2, 3, 5", "2, 3, 4, 5", "5", "2, 5"], "optsCode": false, "ans": 5, "exp": "작은따옴표 3개로 감싼 부분(print(1))은 여러 줄 주석, # 뒤(print(3), print(4))는 한 줄 주석이라 실행되지 않는다.", "topic": "주석"}, {"type": "mc", "no": 7, "cat": "기본", "pts": 3, "q": "<보기> 중 변수명으로 사용할 수 있는 것만을 있는 대로 고른 것은?", "code": null, "bogi": ["ㄱ. my_age", "ㄴ. 1st", "ㄷ. for", "ㄹ. _data", "ㅁ. user name"], "note": null, "opts": ["ㄱ, ㄴ", "ㄱ, ㄹ", "ㄱ, ㄷ, ㄹ", "ㄴ, ㄷ, ㅁ", "ㄱ, ㄹ, ㅁ"], "optsCode": false, "ans": 2, "exp": "ㄴ 숫자로 시작 불가, ㄷ 예약어(for) 불가, ㅁ 공백 불가. 영문자·숫자·언더바(_)만 쓸 수 있고 언더바로 시작하는 것은 가능.", "topic": "변수명 규칙"}, {"type": "mc", "no": 8, "cat": "기본", "pts": 3, "q": "자료형에 대한 설명으로 옳지 않은 것은?", "code": null, "bogi": null, "note": null, "opts": ["3.0은 실수형(float)이다.", "True와 False는 논리형(bool) 값이다.", "\"15\"는 따옴표로 감싸져 있으므로 문자열형(str)이다.", "`'파이썬' * 2`의 결과는 `'파이썬파이썬'`이다.", "`'10' + '20'`의 결과는 `30`이다."], "optsCode": false, "ans": 5, "exp": "문자열끼리 +는 이어 붙이기 → '1020'. 숫자처럼 보여도 따옴표가 있으면 문자열이다.", "topic": "자료형"}, {"type": "mc", "no": 9, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "py = \"I love Python\"\nprint(py.split())", "bogi": null, "note": null, "opts": ["['I', 'love', 'Python']", "I love Python", "['I love Python']", "('I', 'love', 'Python')", "['Ilove', 'Python']"], "optsCode": true, "ans": 1, "exp": "split()은 공백을 기준으로 문자열을 나눠 대괄호로 묶인 목록(리스트) 형태로 돌려준다.", "topic": "문자열 split"}, {"type": "mc", "no": 10, "cat": "기본", "pts": 3, "q": "a = 17, b = 5일 때 연산과 그 결과를 짝지은 것으로 옳지 않은 것은?", "code": null, "bogi": null, "note": null, "opts": ["a + b → 22", "a / b → 3.4", "a // b → 3", "a % b → 2", "a ** 2 → 34"], "optsCode": true, "ans": 5, "exp": "**는 거듭제곱. 17 ** 2 = 289. 34는 17 * 2.", "topic": "산술 연산자"}, {"type": "mc", "no": 11, "cat": "기본", "pts": 3, "q": "다음 중 연산 결과의 자료형이 나머지 넷과 <u>다른<\/u> 것은?", "code": null, "bogi": null, "note": null, "opts": ["4 + 2", "4 * 2", "4 / 2", "4 // 2", "4 % 2"], "optsCode": true, "ans": 3, "exp": "정수끼리의 나눗셈(/)은 나누어떨어져도 실수형 결과를 반환한다. 4 / 2 = 2.0. 나머지는 정수형.", "topic": "연산 결과 자료형"}, {"type": "mc", "no": 12, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "a = 10\na += 5\na //= 4\na **= 2\nprint(a)", "bogi": null, "note": null, "opts": ["9", "14.0625", "16", "25", "36"], "optsCode": false, "ans": 1, "exp": "a = 10 → a += 5 → 15 → a //= 4 → 15 // 4 = 3 → a **= 2 → 3 ** 2 = 9. (14.0625는 //를 /로 착각한 값)", "topic": "복합 대입 연산자"}, {"type": "mc", "no": 13, "cat": "기본", "pts": 3, "q": "비교 연산자에 대한 설명으로 옳은 것은?", "code": null, "bogi": null, "note": null, "opts": ["`a < b`는 왼쪽보다 오른쪽이 작으면 True를 반환한다.", "`a <= b`는 a가 b보다 작거나 같으면 True를 반환한다.", "`a = b`는 a와 b가 같은지 비교하는 연산자이다.", "`a != b`는 a와 b가 같으면 True를 반환한다.", "비교 연산의 결과는 항상 정수형(int) 값이다."], "optsCode": false, "ans": 2, "exp": "① a < b는 ‘왼쪽(a)이 오른쪽(b)보다 작으면’ True. ※ 정리본 표의 < 설명(‘왼쪽보다 오른쪽이 작으면’)은 반대로 적힌 오류이니 외울 때 주의. ③ =는 대입, 비교는 ==. ④ !=는 다르면 True. ⑤ 결과는 True/False(논리형).", "topic": "비교 연산자"}, {"type": "mc", "no": 14, "cat": "기본", "pts": 3, "q": "x = True, y = False일 때 결과가 True인 것은?", "code": null, "bogi": null, "note": null, "opts": ["x and y", "not x", "not (x or y)", "x and not y", "y or (x and y)"], "optsCode": true, "ans": 4, "exp": "not y = True이므로 x and not y = True and True = True. ① False ② False ③ not True = False ⑤ False or False = False.", "topic": "논리 연산자"}, {"type": "mc", "no": 15, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "n = 10\nif n % 3 == 0 and n % 5 == 0:\n    print(\"A\")\nelif n % 3 == 0:\n    print(\"B\")\nelif n % 5 == 0:\n    print(\"C\")\nelse:\n    print(\"D\")", "bogi": null, "note": null, "opts": ["A", "B", "C", "B C", "D"], "optsCode": false, "ans": 3, "exp": "10 % 3 == 0은 거짓, 10 % 5 == 0은 참이다. if-elif-else는 위에서부터 처음 참인 조건 하나의 블록만 실행한다.", "topic": "if-elif-else"}, {"type": "mc", "no": 16, "cat": "응용", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "print(2 ** 3 ** 2, 10 - 4 // 3 * 2)", "bogi": null, "note": null, "opts": ["64 8", "512 4", "64 10", "512 8", "512 10"], "optsCode": true, "ans": 4, "exp": "**는 오른쪽부터 계산: 3 ** 2 = 9 → 2 ** 9 = 512. 뒤 식은 //와 *가 같은 순위라 왼쪽부터: 4 // 3 = 1 → 1 * 2 = 2 → 10 - 2 = 8.", "topic": "연산자 우선순위"}, {"type": "mc", "no": 17, "cat": "응용", "pts": 3, "q": "x = True, y = False, z = False일 때, <보기>에서 결과가 True인 것만을 있는 대로 고른 것은?", "code": null, "bogi": ["ㄱ. x or y and z", "ㄴ. (x or y) and z", "ㄷ. not x or z", "ㄹ. not (y and z)"], "note": null, "opts": ["ㄱ, ㄴ", "ㄱ, ㄹ", "ㄴ, ㄷ", "ㄱ, ㄷ, ㄹ", "ㄴ, ㄷ, ㄹ"], "optsCode": false, "ans": 2, "exp": "우선순위 not > and > or. ㄱ: x or (y and z) = True or False = True. ㄴ: (True) and False = False. ㄷ: (not x) or z = False or False = False. ㄹ: not (False) = True.", "topic": "논리 연산 우선순위"}, {"type": "mc", "no": 18, "cat": "응용", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "i = 1\ntotal = 0\nwhile i < 10:\n    i += 2\n    if i == 7:\n        continue\n    total += i\nprint(total)", "bogi": null, "note": null, "opts": ["17", "20", "24", "26", "28"], "optsCode": false, "ans": 5, "exp": "i는 3, 5, 7, 9, 11 순서로 바뀐다. 7일 때만 continue로 더하기를 건너뛴다. i = 9일 때도 조건(9 < 10)이 참이라 한 번 더 돌아 11이 더해진다 → 3 + 5 + 9 + 11 = 28.", "topic": "while/continue"}, {"type": "mc", "no": 19, "cat": "응용", "pts": 3, "q": "다음 코드를 실행했을 때 출력되는 * 의 개수는?", "code": "for i in range(3):\n    for j in range(i, 4):\n        print(\"*\", end=\"\")", "bogi": null, "note": null, "opts": ["6", "7", "9", "10", "12"], "optsCode": false, "ans": 3, "exp": "i = 0이면 j는 0~3 (4개), i = 1이면 1~3 (3개), i = 2이면 2~3 (2개) → 4 + 3 + 2 = 9.", "topic": "중첩 반복문"}, {"type": "mc", "no": 20, "cat": "응용", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "for i in range(17, 0, -3):\n    if i % 4 == 0:\n        break\n    print(i, end=\" \")", "bogi": null, "note": null, "opts": ["17 14 11", "17 14 11 8", "17 14 11 5 2", "14 11", "17 14 11 8 5 2"], "optsCode": true, "ans": 1, "exp": "range(17, 0, -3)은 17, 14, 11, 8, 5, 2. 8 % 4 == 0에서 break가 실행되어 8은 출력되지 않고 반복이 끝난다. (③은 break를 continue로 착각한 결과)", "topic": "range/break"}, {"type": "sa", "no": "서답형 1", "cat": "기본", "pts": 8, "q": "다음 코드의 실행 결과를 쓰시오.", "code": "a = 7\nb = 2\nprint(a, b, sep=\",\", end=\" | \")\nprint(a // b, a % b)\nprint('{0} / {1} = {2}'.format(a, b, a / b))", "bogi": null, "note": null, "parts": [{"label": "첫째 줄", "kind": "output", "ans": ["7,2 | 3 1"], "pts": 4}, {"label": "둘째 줄", "kind": "output", "ans": ["7 / 2 = 3.5"], "pts": 4}], "exp": "sep=\",\"이라 7과 2 사이에 쉼표, end=\" | \"라 줄이 바뀌지 않고 다음 print(3 1)가 이어진다. 7 / 2는 실수 3.5.", "topic": "print/연산자", "codeLines": false}, {"type": "sa", "no": "서답형 2", "cat": "기본", "pts": 8, "q": "한 줄에 입력된 두 정수 중 큰 수를 출력하는 프로그램이다. 빈칸 ㉠ ~ ㉢에 알맞은 말을 쓰시오. (단, ㉡·㉢은 삼항 연산자를 완성한다.)", "code": "a, b = ( ㉠ )(int, input().split())\nlarge = a ( ㉡ ) a > b ( ㉢ ) b\nprint(large)", "bogi": null, "note": null, "parts": [{"label": "㉠", "kind": "code", "ans": ["map"], "pts": 4}, {"label": "㉡", "kind": "code", "ans": ["if"], "pts": 2}, {"label": "㉢", "kind": "code", "ans": ["else"], "pts": 2}], "exp": "map(자료형, input().split())은 입력한 여러 값을 지정한 자료형으로 바꿔 각 변수에 저장한다. 삼항 연산자: 값1 if 조건식 else 값2.", "topic": "map/삼항 연산자", "codeLines": false}, {"type": "sa", "no": "서답형 3", "cat": "기본", "pts": 9, "q": "다음은 정수 N을 입력받아 1부터 N까지의 합을 ‘합계: 55’처럼 출력하려는 프로그램이다. 키보드로 10을 입력하여 실행했을 때 물음에 답하시오.", "code": "n = input()\ntotal = 0\nfor i in range(1, n + 1):\n    total += i\nprint(\"합계:\" + total)", "bogi": null, "note": null, "parts": [{"label": "(1)", "q": "실행했을 때 처음으로 오류가 ‘발생하는’ 줄 번호와 오류의 이름을 쓰시오.", "kind": "multi", "fields": [{"name": "줄 번호", "kind": "text", "ans": ["3"]}, {"name": "오류 이름", "kind": "text", "ans": ["TypeError"]}], "pts": 3}, {"label": "(2)", "q": "(1) 오류의 ‘원인’이 있는 줄 번호를 쓰고, 그 줄을 바르게 고쳐 쓰시오.", "kind": "multi", "fields": [{"name": "줄 번호", "kind": "text", "ans": ["1"]}, {"name": "고친 코드", "kind": "run", "template": "n = input()\ntotal = 0\nfor i in range(1, n + 1):\n    total += i\nprint(\"합계:\" + total)", "replace": 1, "in": "10", "pass": {"okOrErrorLine": [5]}, "ans": ["n = int(input())"]}], "pts": 3}, {"label": "(3)", "q": "(2)를 고친 뒤에도 오류가 나는 줄 번호를 쓰고, 출력이 ‘합계: 55’가 되도록 그 줄을 고쳐 쓰시오.", "kind": "multi", "fields": [{"name": "줄 번호", "kind": "text", "ans": ["5"]}, {"name": "고친 코드", "kind": "run", "template": "n = int(input())\ntotal = 0\nfor i in range(1, n + 1):\n    total += i\nprint(\"합계:\" + total)", "replace": 5, "in": "10", "pass": {"out": "합계: 55"}, "ans": ["print(\"합계:\", total)", "print(\"합계: \" + str(total))"]}], "pts": 3}], "exp": "input()은 문자열을 돌려주므로 n + 1에서 TypeError가 ‘발생’하지만, 원인은 1번 줄(형 변환 누락)이다. 오류가 난 줄과 원인이 있는 줄이 다를 수 있다. 5번 줄은 문자열 + 정수라 TypeError. 쉼표를 쓰면 공백이 자동으로 들어가 ‘합계: 55’, \"합계:\" + str(total)은 공백 없이 ‘합계:55’가 되므로 오답.", "topic": "오류 찾기", "codeLines": true}, {"type": "sa", "no": "서답형 4", "cat": "응용", "pts": 7, "q": "다음 코드의 실행 결과를 쓰시오.", "code": "c = ord('A')\nfor i in range(1, 4):\n    for j in range(i):\n        print(chr(c), end=\"\")\n        c += 2\n    print()", "bogi": null, "note": null, "parts": [{"label": "실행 결과", "kind": "output", "ans": ["A\nCE\nGIK"], "pts": 7}], "exp": "c는 반복문 밖에서 ord('A') = 65로 시작해 출력할 때마다 2씩 커진다(65 A, 67 C, 69 E, 71 G, 73 I, 75 K). i번째 줄에 i개를 출력하고 print()로 줄을 바꾼다.", "topic": "중첩 반복/아스키코드", "codeLines": false}, {"type": "sa", "no": "서답형 5", "cat": "응용", "pts": 8, "q": "다음은 학생이 반복문에 대해 정리한 내용이다. 물음에 답하시오.", "code": null, "bogi": ["(가) range(5)는 0부터 4까지 5개의 값을 만든다.", "(나) range(1, 10, 3)이 만드는 값은 1, 4, 7, 10이다.", "(다) range(10, 0, -2)가 만드는 마지막 값은 2이다.", "(라) break는 가장 가까운 반복문 하나만 즉시 종료한다.", "(마) <u>continue<\/u>를 만나면 반복문 전체가 즉시 종료된다."], "note": null, "parts": [{"label": "(1)", "q": "옳지 않은 문장 2개를 찾아 기호를 쓰시오.", "kind": "set", "ans": ["나", "마"], "pts": 4}, {"label": "(2)", "q": "(나)의 range(1, 10, 3)이 실제로 만드는 값을 모두 쓰시오.", "kind": "nums", "ans": ["1 4 7"], "pts": 2}, {"label": "(3)", "q": "(마)의 밑줄 친 continue를 다른 명령어로 바꾸면 옳은 문장이 된다. 그 명령어를 쓰시오.", "kind": "code", "ans": ["break"], "pts": 2}], "exp": "(나) 증가량이 3이면 1, 4, 7 다음 값 10은 끝 값(10)에 포함되지 않는다. ‘y-1까지’라는 정리본 표현은 증가량이 1일 때만 정확하다. (마) 반복문 전체를 끝내는 것은 break, continue는 현재 회차의 남은 부분만 건너뛰고 다음 반복으로 넘어간다.", "topic": "range/break/continue", "codeLines": false}]}, {"title": "2회", "items": [{"type": "mc", "no": 1, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과에 대한 설명으로 옳지 않은 것은?", "code": "print(38)\nprint(\"1\" + \"2\")\nprint(1 + 2)\nprint(\"파\", \"이\", \"썬\")", "bogi": null, "note": null, "opts": ["첫째 줄에는 38이 출력된다.", "둘째 줄에는 12가 출력된다.", "셋째 줄에는 3이 출력된다.", "넷째 줄에는 ‘파 이 썬’처럼 글자 사이에 공백이 들어간다.", "넷째 줄을 `print(\"파\" + \"이\" + \"썬\")`으로 바꿔도 실행 결과는 같다."], "optsCode": false, "ans": 5, "exp": "쉼표는 공백을 넣어 ‘파 이 썬’, +는 그대로 붙여 ‘파이썬’. 둘째 줄은 문자열 \"1\"+\"2\" = \"12\".", "topic": "print"}, {"type": "mc", "no": 2, "cat": "기본", "pts": 3, "q": "다음 중 실행 결과가 <u>\"큰따옴표\"<\/u>(큰따옴표까지 포함)가 아닌 것은?", "code": null, "bogi": null, "note": null, "opts": ["print(\"\\\"큰따옴표\\\"\")", "print('\"큰따옴표\"')", "print(\"\\\"큰따옴표\" + '\"')", "print('\\\"큰따옴표\\\"')", "print(\"\\n큰따옴표\\n\")"], "optsCode": true, "ans": 5, "exp": "\\\"는 큰따옴표 자체를 출력하는 이스케이프 문자. 작은따옴표 문자열 안에서는 \"를 그냥 써도 된다. \\n은 줄바꿈이라 ⑤는 따옴표 없이 위아래로 빈 줄이 생긴다.", "topic": "이스케이프 문자"}, {"type": "mc", "no": 3, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "print('{0}의 점수는 {1}점, {0} 화이팅'.format('Kim', 92))", "bogi": null, "note": null, "opts": ["Kim의 점수는 92점, Kim 화이팅", "Kim의 점수는 92점, 92 화이팅", "92의 점수는 Kim점, 92 화이팅", "{0}의 점수는 {1}점, {0} 화이팅", "Kim의 점수는 92점, 화이팅"], "optsCode": false, "ans": 1, "exp": "{0}에는 format 괄호 안 첫 번째 값, {1}에는 두 번째 값이 들어간다. 같은 번호를 여러 번 써도 된다.", "topic": "format"}, {"type": "mc", "no": 4, "cat": "기본", "pts": 3, "q": "키보드로 3.5를 입력했을 때 오류가 발생하는 코드는?", "code": null, "bogi": null, "note": null, "opts": ["print(input())", "print(float(input()) * 2)", "print(int(input()))", "print(input() * 2)", "print(float(input()) + 1)"], "optsCode": true, "ans": 3, "exp": "int()는 '3.5'처럼 소수점이 있는 문자열을 정수로 바꾸지 못한다(ValueError). ④는 문자열 반복이라 3.53.5.", "topic": "자료형 변환"}, {"type": "mc", "no": 5, "cat": "기본", "pts": 3, "q": "다음 코드를 실행하고 키보드로 <u>␣␣a,b,c␣␣<\/u>(앞뒤에 공백 2칸씩)를 입력했을 때의 실행 결과로 옳은 것은?", "code": "s = input().strip()\nprint(s.split(','))", "bogi": null, "note": null, "opts": ["['a', 'b', 'c']", "['  a', 'b', 'c  ']", "['a,b,c']", "a b c", "['a', ',', 'b', ',', 'c']"], "optsCode": true, "ans": 1, "exp": "strip()은 앞뒤 공백을 제거 → 'a,b,c'. split(',')은 쉼표를 기준으로 나눈다.", "topic": "strip/split"}, {"type": "mc", "no": 6, "cat": "기본", "pts": 3, "q": "주석에 대한 설명으로 옳은 것은?", "code": null, "bogi": null, "note": null, "opts": ["주석으로 쓴 내용도 실행 결과에 출력된다.", "한 줄 주석은 //를 사용한다.", "여러 줄 주석은 큰따옴표 3개나 작은따옴표 3개로 감싼다.", "# 뒤에 쓴 코드도 실행된다.", "주석은 프로그램의 맨 첫 줄에만 쓸 수 있다."], "optsCode": false, "ans": 3, "exp": "주석은 실행되지 않는 설명(또는 디버깅용 코드). 한 줄 주석은 #, 여러 줄은 \"\"\" \"\"\" 또는 ''' '''. 코드 줄 끝에도 쓸 수 있다.", "topic": "주석"}, {"type": "mc", "no": 7, "cat": "기본", "pts": 3, "q": "변수명 규칙에 대한 설명으로 옳지 않은 것은?", "code": null, "bogi": null, "note": null, "opts": ["영문자, 숫자, 언더바(_)를 사용할 수 있다.", "숫자로 시작할 수 없다.", "대소문자를 구분하므로 Age와 age는 서로 다른 변수이다.", "if, for, break 같은 예약어는 변수명으로 쓸 수 없다.", "단어 사이에 공백을 넣어 `my score`처럼 만들 수 있다."], "optsCode": false, "ans": 5, "exp": "공백과 특수문자는 변수명에 쓸 수 없다. 단어를 나눌 때는 my_score처럼 언더바를 쓴다.", "topic": "변수명 규칙"}, {"type": "mc", "no": 8, "cat": "기본", "pts": 3, "q": "<보기>에서 옳은 것만을 있는 대로 고른 것은?", "code": null, "bogi": ["ㄱ. 3과 3.0은 같은 자료형이다.", "ㄴ. 논리형(bool)은 True 또는 False 값을 가진다.", "ㄷ. str(25)의 결과는 문자열 '25'이다.", "ㄹ. 'ab' * 3의 결과는 'ab3'이다."], "note": null, "opts": ["ㄱ, ㄴ", "ㄴ, ㄷ", "ㄷ, ㄹ", "ㄱ, ㄴ, ㄷ", "ㄴ, ㄷ, ㄹ"], "optsCode": false, "ans": 2, "exp": "ㄱ: 3은 정수형(int), 3.0은 실수형(float). ㄹ: 문자열 * 정수는 반복 → 'ababab'.", "topic": "자료형"}, {"type": "mc", "no": 9, "cat": "기본", "pts": 3, "q": "다음 코드를 실행하고 키보드로 10 20을 입력했을 때에 대한 설명으로 옳은 것은?", "code": "a, b = input().split()\na = int(a)\nprint(a + b)", "bogi": null, "note": null, "opts": ["30이 출력된다.", "1020이 출력된다.", "10 20이 출력된다.", "a는 정수형, b는 문자열형이라 연산할 수 없어 오류(TypeError)가 발생한다.", "split()은 공백을 기준으로 나눌 수 없어 오류(ValueError)가 발생한다."], "optsCode": false, "ans": 4, "exp": "a만 int로 바꾸고 b는 문자열 '20' 그대로이므로 정수 + 문자열 → TypeError. (정리본 ‘자료형 변환’ 예시)", "topic": "자료형 변환"}, {"type": "mc", "no": 10, "cat": "기본", "pts": 3, "q": "연산과 그 결과를 짝지은 것으로 옳지 않은 것은?", "code": null, "bogi": null, "note": null, "opts": ["7 // 2 → 3", "7 % 2 → 1", "2 ** 4 → 16", "6 / 3 → 2", "1.5 + 2 → 3.5"], "optsCode": true, "ans": 4, "exp": "정수끼리의 나눗셈(/)은 항상 실수형 → 2.0. ⑤ 정수와 실수의 연산은 실수형.", "topic": "산술 연산자"}, {"type": "mc", "no": 11, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "x = 3\nx *= 4\nx -= 2\nx %= 4\nprint(x)", "bogi": null, "note": null, "opts": ["0", "1", "2", "2.5", "10"], "optsCode": false, "ans": 3, "exp": "x = 3 → x *= 4 → 12 → x -= 2 → 10 → x %= 4 → 10을 4로 나눈 나머지 2.", "topic": "복합 대입 연산자"}, {"type": "mc", "no": 12, "cat": "기본", "pts": 3, "q": "i = 100, j = 10일 때, <보기>에서 결과가 True인 것만을 있는 대로 고른 것은?", "code": null, "bogi": ["ㄱ. i < j", "ㄴ. i >= j", "ㄷ. i == j", "ㄹ. i != j", "ㅁ. i // j == j"], "note": null, "opts": ["ㄴ, ㄹ, ㅁ", "ㄴ, ㄹ", "ㄴ, ㄷ, ㄹ", "ㄱ, ㄷ, ㅁ", "ㄱ, ㄴ, ㄹ, ㅁ"], "optsCode": false, "ans": 1, "exp": "ㄱ 100 < 10 거짓, ㄴ 참, ㄷ 거짓, ㄹ 참, ㅁ 100 // 10 = 10이고 10 == 10 → 참. 산술 연산(//)이 비교(==)보다 먼저 계산된다.", "topic": "비교 연산자"}, {"type": "mc", "no": 13, "cat": "기본", "pts": 3, "q": "논리 연산에 대한 설명으로 옳지 않은 것은?", "code": null, "bogi": null, "note": null, "opts": ["A = True, B = True이면 A and B는 True이다.", "A = True, B = False이면 A and B는 False이다.", "A = False, B = True이면 A or B는 True이다.", "A = False, B = False이면 A or B는 True이다.", "A = False이면 not A는 True이다."], "optsCode": false, "ans": 4, "exp": "or는 하나라도 True이면 True, 둘 다 False이면 False.", "topic": "논리 연산자"}, {"type": "mc", "no": 14, "cat": "기본", "pts": 3, "q": "조건문(if)에 대한 설명으로 옳지 않은 것은?", "code": null, "bogi": null, "note": null, "opts": ["조건이 참일 때 실행되는 문장들은 같은 들여쓰기를 해야 한다.", "else는 생략할 수 있다.", "elif는 하나의 if문 안에서 여러 번 쓸 수 있다.", "if-elif-else에서 참인 조건이 여러 개이면 해당 블록이 모두 실행된다.", "if문 안에 또 다른 if문을 넣을 수 있다."], "optsCode": false, "ans": 4, "exp": "if-elif-else는 위에서부터 검사해 처음 참인 조건 ‘하나’의 블록만 실행하고 나머지는 건너뛴다.", "topic": "선택제어문"}, {"type": "mc", "no": 15, "cat": "기본", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "a = 50\nb = 35\nlarge = a if a > b else b\nprint(large, chr(ord('A') + 2))", "bogi": null, "note": null, "opts": ["35 C", "50 C", "50 B", "50 67", "85 C"], "optsCode": true, "ans": 2, "exp": "삼항 연산자: a > b가 참이므로 large = a = 50. ord('A') = 65, 65 + 2 = 67 → chr(67) = 'C'.", "topic": "삼항 연산자/아스키코드"}, {"type": "mc", "no": 16, "cat": "응용", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "print(-2 ** 2, 3 + 4 * 2 ** 2)", "bogi": null, "note": null, "opts": ["-4 19", "4 19", "4 28", "-4 196", "-4 28"], "optsCode": true, "ans": 1, "exp": "**가 단항 연산자 -보다 먼저: -(2 ** 2) = -4. 3 + 4 * 2 ** 2 → 2 ** 2 = 4 → 4 * 4 = 16 → 3 + 16 = 19.", "topic": "연산자 우선순위"}, {"type": "mc", "no": 17, "cat": "응용", "pts": 3, "q": "<보기>에서 옳은 것만을 있는 대로 고른 것은?", "code": null, "bogi": ["ㄱ. for i in range(4):는 i가 0, 1, 2, 3 순서로 4번 반복된다.", "ㄴ. range(2, 11, 3)이 만드는 값은 2, 5, 8, 11이다.", "ㄷ. range(10, 1, -3)이 만드는 값은 10, 7, 4이다.", "ㄹ. range(5, 5)는 5를 한 번 만든다."], "note": null, "opts": ["ㄱ, ㄴ", "ㄱ, ㄷ", "ㄴ, ㄹ", "ㄱ, ㄷ, ㄹ", "ㄴ, ㄷ, ㄹ"], "optsCode": false, "ans": 2, "exp": "ㄴ: 2, 5, 8 다음 11은 끝 값 11에 포함되지 않는다. ㄷ: 10, 7, 4 다음 1은 끝 값(1)에 닿으므로 포함 안 됨. ㄹ: 시작과 끝이 같으면 아무 값도 만들지 않아 한 번도 반복하지 않는다.", "topic": "range"}, {"type": "mc", "no": 18, "cat": "응용", "pts": 3, "q": "다음 코드의 실행 결과로 옳은 것은?", "code": "n = 0\ncount = 0\nwhile True:\n    n += 3\n    if n % 2 == 0:\n        continue\n    count += 1\n    if n > 10:\n        break\nprint(n, count)", "bogi": null, "note": null, "opts": ["12 3", "15 3", "15 5", "9 2", "무한 반복"], "optsCode": true, "ans": 2, "exp": "n = 3(홀수, count 1) → 6(짝수, continue) → 9(count 2) → 12(continue) → 15(count 3, 15 > 10이라 break). continue가 break 검사보다 위에 있어 짝수일 때는 break 검사를 하지 않는다.", "topic": "while/break/continue"}, {"type": "mc", "no": 19, "cat": "응용", "pts": 3, "q": "다음 코드를 실행했을 때 출력되는 수는 모두 몇 개인가?", "code": "for i in range(1, 4):\n    for j in range(1, 4):\n        if j > i:\n            break\n        print(i * j, end=\" \")\n    print()", "bogi": null, "note": null, "opts": ["3", "4", "6", "7", "9"], "optsCode": false, "ans": 3, "exp": "j > i가 되는 순간 안쪽 반복만 끝난다(break는 가장 가까운 반복문 하나만 종료). i = 1: 1개, i = 2: 2개, i = 3: 3개 → 6개 (1 / 2 4 / 3 6 9).", "topic": "중첩 반복/break"}, {"type": "mc", "no": 20, "cat": "응용", "pts": 3, "q": "다음 중 무한 반복(무한 루프)이 되는 코드는?", "code": null, "bogi": null, "note": null, "opts": ["i = 1\nwhile i <= 5:\n    i += 1", "i = 10\nwhile i > 0:\n    i -= 3", "i = 1\nwhile True:\n    i *= 2\n    if i > 100:\n        break", "for i in range(10, 0, -1):\n    print(i)", "i = 1\nwhile i != 10:\n    i += 2"], "optsCode": true, "ans": 5, "exp": "i는 1, 3, 5, 7, 9, 11, … 처럼 홀수만 되어 10과 같아지는 순간이 없으므로 조건 i != 10이 항상 True. ②는 10, 7, 4, 1, -2에서 종료.", "topic": "무한 루프"}, {"type": "sa", "no": "서답형 1", "cat": "기본", "pts": 8, "q": "다음 코드의 실행 결과를 쓰시오.", "code": "a = 13\nb = 4\nprint(a // b, a % b, sep=\":\")\nprint(a / b, end=\"!\")\nprint(\"끝\")", "bogi": null, "note": null, "parts": [{"label": "첫째 줄", "kind": "output", "ans": ["3:1"], "pts": 4}, {"label": "둘째 줄", "kind": "output", "ans": ["3.25!끝"], "pts": 4}], "exp": "sep=\":\"이므로 13 // 4 = 3과 13 % 4 = 1 사이에 콜론. 13 / 4 = 3.25 뒤에 end=\"!\"가 붙고 줄이 바뀌지 않아 ‘끝’이 같은 줄에 이어진다.", "topic": "print/연산자", "codeLines": false}, {"type": "sa", "no": "서답형 2", "cat": "기본", "pts": 8, "q": "정수 N을 입력받아 1부터 N까지의 수 중 짝수의 합을 출력하는 프로그램이다. 빈칸 ㉠, ㉡에 알맞은 식이나 값을 쓰시오. (단, N은 2 이상)", "code": "N = int(input())\ntotal = 0\nfor i in range(2, ( ㉠ ), ( ㉡ )):\n    total += i\nprint(total)", "bogi": null, "note": null, "parts": [{"label": "㉠", "kind": "code", "ans": ["N+1", "1+N"], "pts": 4}, {"label": "㉡", "kind": "code", "ans": ["2"], "pts": 4}], "exp": "range(2, N + 1, 2)는 2부터 2씩 커지며 N 이하의 짝수를 만든다. 끝 값은 포함되지 않으므로 N까지 포함하려면 N + 1.", "topic": "for/range", "codeLines": false}, {"type": "sa", "no": "서답형 3", "cat": "기본", "pts": 9, "q": "다음은 점수를 입력받아 60점 이상이면 PASS, 아니면 FAIL을 출력하려는 프로그램이다. 물음에 답하시오.", "code": "score = int(input())\nif score >= 60\n    print(\"PASS\")\nelse:\nprint(\"FAIL\")", "bogi": null, "note": null, "parts": [{"label": "(1)", "q": "2번 줄의 오류를 바르게 고쳐 쓰시오.", "kind": "code", "ans": ["if score >= 60:", "if 60 <= score:", "if score > 59:"], "pts": 3}, {"label": "(2)", "q": "(1)을 고친 뒤 실행하면 5번 줄에서 발생하는 오류의 이름을 쓰시오.", "kind": "text", "ans": ["IndentationError"], "pts": 3}, {"label": "(3)", "q": "모든 오류를 고친 뒤 키보드로 58을 입력했을 때의 실행 결과를 쓰시오.", "kind": "output", "ans": ["FAIL"], "pts": 3}], "exp": "if·elif·else·while·for 줄 끝에는 콜론(:)이 필요하다(SyntaxError: expected ':'). else 아래 실행할 문장은 들여쓰기를 해야 한다(IndentationError: expected an indented block).", "topic": "오류 찾기", "codeLines": true}, {"type": "sa", "no": "서답형 4", "cat": "응용", "pts": 7, "q": "다음 코드의 실행 결과를 쓰시오. (단, 공백은 ∨로 표시한다.)", "code": "N = 4\nfor i in range(1, N + 1):\n    for j in range(N - i):\n        print(\" \", end=\"\")\n    for j in range(i):\n        print(j + 1, end=\"\")\n    print()", "bogi": null, "note": null, "parts": [{"label": "실행 결과", "kind": "output", "ans": ["   1\n  12\n 123\n1234"], "pts": 7}], "exp": "i번째 줄에 공백 (4 - i)개를 먼저 출력한 뒤 1부터 i까지 붙여서 출력한다(end=\"\").", "topic": "중첩 반복문", "codeLines": false}, {"type": "sa", "no": "서답형 5", "cat": "응용", "pts": 8, "q": "다음은 학생이 반복문에 대해 정리한 내용이다. 물음에 답하시오.", "code": null, "bogi": ["(가) while문은 조건식이 참(True)인 동안 블록을 반복 실행한다.", "(나) while문의 조건식이 처음부터 거짓이면 블록은 한 번 실행된 뒤 종료된다.", "(다) 조건식이 항상 True이면 무한 루프가 되며, break로 빠져나올 수 있다.", "(라) 중첩 반복문의 안쪽 반복문에서 break가 실행되면 바깥 반복문까지 모두 종료된다.", "(마) for 변수 in range(n):은 n번 반복한다."], "note": null, "parts": [{"label": "(1)", "q": "옳지 않은 문장 2개를 찾아 기호를 쓰시오.", "kind": "set", "ans": ["나", "라"], "pts": 4}, {"label": "(2)", "q": "(나)의 상황에서 while문의 블록은 몇 번 실행되는가?", "kind": "nums", "ans": ["0"], "pts": 2}, {"label": "(3)", "q": "(라)에서 break가 실행되면 실제로 종료되는 반복문은 무엇인지 쓰시오.", "kind": "keyword", "ans": ["안쪽", "가장 가까운", "가까운"], "show": "안쪽 반복문(가장 가까운 반복문 하나)", "pts": 2}], "exp": "(나) while은 블록을 실행하기 ‘전에’ 조건을 먼저 검사하므로 처음부터 거짓이면 한 번도 실행하지 않는다. (라) break는 가장 가까운 반복문 하나(안쪽 반복문)만 종료하고, 바깥 반복문은 계속된다.", "topic": "while/break", "codeLines": false}]}], "assets": ["./", "index.html", "worker.js", "runner.py", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"], "cacheName": "pyj-ea3d1c6097", "version": "ea3d1c6097"}</script>
+<script>"use strict";
+/* ───────────── 공통 ───────────── */
+const DATA = JSON.parse(document.getElementById("data").textContent);
+const $ = (s, r = document) => r.querySelector(s);
+const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+function md(s, bold = true) {
+  // **굵게**(문제 지문만), `코드`, <u>밑줄</u>, 줄바꿈
+  let t = esc(s);
+  t = t.replace(/&lt;u&gt;/g, "<u>").replace(/&lt;\/u&gt;/g, "</u>");
+  if (bold) t = t.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>");
+  t = t.replace(/`([^`]+)`/g, "<code>$1</code>");
+  return t.replace(/\n/g, "<br>");
+}
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("pyj." + k); return v == null ? d : JSON.parse(v); } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("pyj." + k, JSON.stringify(v)); } catch {} },
+};
+function toast(msg, ms = 2600) {
+  const t = document.createElement("div"); t.className = "toast"; t.textContent = msg;
+  document.body.appendChild(t); setTimeout(() => t.remove(), ms);
+}
+const CIRC = ["①", "②", "③", "④", "⑤"];
+
+/* ───────────── 파이썬 엔진 ───────────── */
+const Engine = {
+  w: null, ready: false, version: "", seq: 0, pend: new Map(), listeners: [],
+  onStatus(fn) { this.listeners.push(fn); },
+  emit(s, m) { this.state = s; this.listeners.forEach((f) => f(s, m)); },
+  start() {
+    this.ready = false; this.emit("loading");
+    let w;
+    try { w = new Worker("worker.js", { type: "module" }); }
+    catch (e) { this.emit("error", "이 브라우저는 모듈 워커를 지원하지 않음"); return; }
+    this.w = w;
+    w.onmessage = (e) => {
+      const m = e.data;
+      if (m.type === "ready") { this.ready = true; this.version = m.version; this.emit("ready"); }
+      else if (m.type === "bootError") this.emit("error", m.message);
+      else if (m.type === "result") {
+        const p = this.pend.get(m.id);
+        if (p) { clearTimeout(p.t); this.pend.delete(m.id); p.resolve(m.res); }
+      }
+    };
+    w.onerror = (e) => { this.emit("error", e.message || "워커 오류"); };
+  },
+  run(code, stdin, opts = {}) {
+    return new Promise((resolve) => {
+      const id = ++this.seq;
+      const limit = this.ready ? 20000 : 90000;
+      const t = setTimeout(() => { this.restart("hang"); }, limit);
+      this.pend.set(id, { resolve, t });
+      this.w.postMessage({ id, code, stdin, record: !!opts.record, softLimit: 6 });
+    });
+  },
+  restart(reason) {
+    try { this.w && this.w.terminate(); } catch {}
+    for (const [, p] of this.pend) {
+      clearTimeout(p.t);
+      p.resolve({ stdout: "", error: { type: reason === "stop" ? "Stopped" : "Hang", msg: "", tb: "" } });
+    }
+    this.pend.clear();
+    this.start();
+  },
+  get busy() { return this.pend.size > 0; },
+};
+
+/* ───────────── 문법 색칠 ───────────── */
+const KW = new Set("False None True and as assert async await break class continue def del elif else except finally for from global if import in is lambda nonlocal not or pass raise return try while with yield".split(" "));
+const BI = new Set("print input int float str range len ord chr map abs max min sum type bool list round".split(" "));
+function tokenize(code) {
+  const lines = code.split("\n"); let state = null;
+  return lines.map((line) => {
+    const segs = []; let i = 0;
+    const push = (t, c) => { if (t) segs.push([t, c]); };
+    if (state) {
+      const end = line.indexOf(state);
+      if (end < 0) { push(line, "s"); return segs; }
+      push(line.slice(0, end + 3), "s"); i = end + 3; state = null;
+    }
+    while (i < line.length) {
+      const rest = line.slice(i); let m;
+      if (rest.startsWith('"""') || rest.startsWith("'''")) {
+        const q = rest.slice(0, 3); const end = line.indexOf(q, i + 3);
+        if (end < 0) { push(line.slice(i), "s"); state = q; break; }
+        push(line.slice(i, end + 3), "s"); i = end + 3; continue;
+      }
+      if ((m = rest.match(/^#.*/))) { push(m[0], "c"); i += m[0].length; continue; }
+      if ((m = rest.match(/^(?:[fFrRbBuU]{1,2})?(?:"(?:[^"\\]|\\.)*"?|'(?:[^'\\]|\\.)*'?)/)) && /["']/.test(m[0])) { push(m[0], "s"); i += m[0].length; continue; }
+      if ((m = rest.match(/^\d+(?:\.\d*)?/))) { push(m[0], "n"); i += m[0].length; continue; }
+      if ((m = rest.match(/^[A-Za-z_ㄱ-힝][\wㄱ-힝]*/))) {
+        push(m[0], KW.has(m[0]) ? "k" : BI.has(m[0]) ? "b" : ""); i += m[0].length; continue;
+      }
+      push(rest[0], ""); i += 1;
+    }
+    return segs;
+  });
+}
+function markRange(segs, a, b, cls) {
+  // a,b: 0부터 시작하는 글자 위치 [a,b)
+  const out = []; let pos = 0;
+  for (const [t, c] of segs) {
+    const s = pos, e = pos + t.length; pos = e;
+    if (e <= a || s >= b) { out.push([t, c]); continue; }
+    const x = Math.max(a, s) - s, y = Math.min(b, e) - s;
+    if (x > 0) out.push([t.slice(0, x), c]);
+    out.push([t.slice(x, y), (c ? c + " " : "") + cls]);
+    if (y < t.length) out.push([t.slice(y), c]);
+  }
+  return out;
+}
+function segHTML(segs) {
+  return segs.map(([t, c]) => c ? `<span class="${c.split(" ").map((x) => x === "err" ? "t-err" : "t-" + x).join(" ")}">${esc(t)}</span>` : esc(t)).join("");
+}
+
+/* ───────────── 코드 편집기 ───────────── */
+class Editor {
+  constructor(root, opts = {}) {
+    this.opts = opts;
+    root.innerHTML = `
+      <div class="keys" role="toolbar" aria-label="특수 키"></div>
+      <div class="ed ${opts.short ? "short" : ""}"><div class="ed-gutter" aria-hidden="true"></div>
+        <div class="ed-body"><pre class="ed-hl" aria-hidden="true"><span class="wrap"></span></pre>
+        <textarea class="ed-ta" spellcheck="false" autocapitalize="off" autocomplete="off" autocorrect="off" wrap="off"
+          aria-label="파이썬 코드" placeholder="# 여기에 코드를 작성하세요"></textarea></div></div>`;
+    this.ta = $(".ed-ta", root); this.hl = $(".ed-hl", root); this.wrap = $(".wrap", root); this.gut = $(".ed-gutter", root);
+    this.marks = { err: null, loop: [], cur: null };
+    const keys = [["⇥", "tab", "들여쓰기"], ["⇤", "untab", "내어쓰기"], [":"], ["("], [")"], ['"'], ["'"], ["="], ["+"], ["-"], ["*"], ["/"], ["%"], ["<"], [">"], ["!"], ["#"], ["_"], [","], ["["], ["]"], ["{"], ["}"], ["\\"]];
+    const kb = $(".keys", root);
+    for (const [label, act, aria] of keys) {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = label; b.setAttribute("aria-label", aria || label);
+      b.addEventListener("pointerdown", (e) => e.preventDefault()); // 키보드가 내려가지 않게
+      b.addEventListener("click", () => { if (act === "tab") this.indent(false); else if (act === "untab") this.indent(true); else this.insert(label); });
+      kb.appendChild(b);
+    }
+    this.ta.addEventListener("input", () => { this.fixQuotes(); this.clearMarks(false); this.render(); opts.onChange && opts.onChange(this.value); });
+    this.ta.addEventListener("scroll", () => this.sync());
+    this.ta.addEventListener("keydown", (e) => this.onKey(e));
+    this.render();
+  }
+  get value() { return this.ta.value; }
+  set value(v) { this.ta.value = v; this.clearMarks(false); this.render(); }
+  focus() { this.ta.focus(); }
+  insert(text) {
+    this.ta.focus();
+    let ok = false;
+    try { ok = document.execCommand("insertText", false, text); } catch {}
+    if (!ok) { this.ta.setRangeText(text, this.ta.selectionStart, this.ta.selectionEnd, "end"); this.ta.dispatchEvent(new Event("input")); }
+  }
+  fixQuotes() {
+    const v = this.ta.value;
+    if (!/[“”‘’]/.test(v)) return;
+    const pos = this.ta.selectionStart;
+    this.ta.value = v.replace(/[“”]/g, '"').replace(/[‘’]/g, "'");
+    this.ta.setSelectionRange(pos, pos);
+    if (!this._quoteTip) { this._quoteTip = true; toast("아이패드가 바꾼 둥근 따옴표(“ ”)를 곧은 따옴표로 고쳤어요"); }
+  }
+  lineStart(pos) { return this.ta.value.lastIndexOf("\n", pos - 1) + 1; }
+  onKey(e) {
+    if (e.isComposing || e.keyCode === 229) return;
+    const ta = this.ta, v = ta.value, s = ta.selectionStart, en = ta.selectionEnd;
+    if (e.key === "Tab") { e.preventDefault(); this.indent(e.shiftKey); return; }
+    if (e.key === "Enter" && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+      e.preventDefault();
+      const ls = this.lineStart(s); const before = v.slice(ls, s);
+      let ind = (before.match(/^ */) || [""])[0];
+      const t = before.replace(/#.*$/, "").trimEnd();
+      if (t.endsWith(":")) ind += "    ";
+      else if (/^\s*(return|break|continue|pass)\b/.test(before) && ind.length >= 4) ind = ind.slice(4);
+      this.insert("\n" + ind); return;
+    }
+    if (e.key === "Backspace" && s === en && s > 0) {
+      const ls = this.lineStart(s); const before = v.slice(ls, s);
+      if (before.length > 0 && /^ +$/.test(before)) {
+        e.preventDefault();
+        const n = before.length % 4 === 0 ? 4 : before.length % 4;
+        ta.setSelectionRange(s - n, s);
+        try { if (!document.execCommand("delete")) throw 0; } catch { ta.setRangeText("", s - n, s, "end"); ta.dispatchEvent(new Event("input")); }
+      }
+    }
+  }
+  indent(out) {
+    const ta = this.ta, v = ta.value; let s = ta.selectionStart, en = ta.selectionEnd;
+    const ls = this.lineStart(s);
+    if (s === en && !out) { this.insert("    "); return; }
+    let le = v.indexOf("\n", en - (en > s && v[en - 1] === "\n" ? 1 : 0)); if (le < 0) le = v.length;
+    const block = v.slice(ls, le).split("\n");
+    const nb = block.map((l) => out ? l.replace(/^ {1,4}/, "") : "    " + l).join("\n");
+    ta.focus(); ta.setSelectionRange(ls, le);
+    let ok = false; try { ok = document.execCommand("insertText", false, nb); } catch {}
+    if (!ok) { ta.setRangeText(nb, ls, le, "end"); ta.dispatchEvent(new Event("input")); }
+    if (s !== en || out) ta.setSelectionRange(ls, ls + nb.length);
+  }
+  clearMarks(rerender = true) { this.marks = { err: null, loop: [], cur: null }; if (rerender) this.render(); }
+  markError(err) {
+    this.marks.err = null; this.marks.loop = [];
+    if (!err) return this.render();
+    if (err.loopLines && err.loopLines.length) this.marks.loop = err.loopLines;
+    if (err.line) this.marks.err = { line: err.line, col: err.col, endLine: err.endLine, endCol: err.endCol };
+    this.render(); this.reveal(err.line);
+  }
+  setCurrent(line) { this.marks.cur = line; this.render(); if (line) this.reveal(line); }
+  reveal(line) {
+    if (!line) return;
+    const top = (line - 1) * 24, h = this.ta.clientHeight;
+    if (top < this.ta.scrollTop + 24 || top > this.ta.scrollTop + h - 60) this.ta.scrollTop = Math.max(0, top - h / 3);
+  }
+  render() {
+    const toks = tokenize(this.ta.value); const m = this.marks;
+    const html = [], gut = [];
+    toks.forEach((segs, i) => {
+      const n = i + 1; let cls = "L";
+      if (m.err && m.err.line === n) {
+        cls += " lerr";
+        const lineText = segs.map((x) => x[0]).join("");
+        if (m.err.col) {
+          let a = m.err.col - 1, b = (m.err.endLine === n || !m.err.endLine) && m.err.endCol && m.err.endCol > m.err.col ? m.err.endCol - 1 : a + 1;
+          if (a >= lineText.length) { a = Math.max(0, lineText.length - 1); b = lineText.length; }
+          if (b > a) segs = markRange(segs, a, b, "err");
+        }
+      } else if (m.loop.includes(n)) cls += " lloop";
+      if (m.cur === n) cls += " lcur";
+      html.push(`<span class="${cls}">${segHTML(segs) || " "}</span>`);
+      gut.push(`<div class="${m.err && m.err.line === n ? "gerr" : m.cur === n ? "gcur" : ""}">${n}</div>`);
+    });
+    this.wrap.innerHTML = html.join("");
+    this.gut.innerHTML = gut.join("");
+    this.sync();
+  }
+  sync() { this.hl.scrollTop = this.ta.scrollTop; this.hl.scrollLeft = this.ta.scrollLeft; this.gut.scrollTop = this.ta.scrollTop; }
+}
+
+/* ───────────── 출력 비교 ───────────── */
+const normLines = (s) => {
+  const L = String(s).replace(/\r\n?/g, "\n").split("\n").map((l) => l.replace(/\s+$/, ""));
+  while (L.length && L[L.length - 1] === "") L.pop();
+  return L;
+};
+function compareOut(expected, actual) {
+  const E = normLines(expected), A = normLines(actual);
+  const pass = E.length === A.length && E.every((l, i) => l === A[i]);
+  const trailing = pass && String(actual).replace(/\n+$/, "") !== E.join("\n");
+  return { pass, E, A, trailing };
+}
+function showWS(s, on) {
+  if (!on) return esc(s);
+  return esc(s).replace(/ /g, '<span class="ws">·</span>').replace(/\t/g, '<span class="ws">⇥</span>');
+}
+function firstDiff(a, b) { let j = 0; while (j < a.length && j < b.length && a[j] === b[j]) j++; return j; }
+function analyzeDiff(E, A, code, hide) {
+  const tips = [];
+  if (A.length === 0 && E.length > 0) {
+    tips.push(/print\s*\(/.test(code) ? "아무것도 출력되지 않았어요. print가 조건문 안에 갇혀 실행되지 않았거나, 반복이 한 번도 돌지 않았는지 확인." : "print()가 없어서 아무것도 출력되지 않았어요.");
+    return { tips, line: 0 };
+  }
+  if (E.length === 0 && A.length > 0) { tips.push("이 입력에서는 아무것도 출력하면 안 돼요. 조건(예: 10보다 ‘크면’ → > , 이상 → >=)을 확인."); return { tips, line: 0 }; }
+  let i = 0; while (i < E.length && i < A.length && E[i] === A[i]) i++;
+  if (A.length !== E.length) {
+    tips.push(`줄 수가 달라요: 정답 ${E.length}줄, 내 출력 ${A.length}줄.`);
+    if (A.length === 1 && E.length > 1 && A[0].replace(/\s+/g, "") === E.join("").replace(/\s+/g, "")) tips.push("여러 줄이어야 할 내용이 한 줄로 이어졌어요. end=\" \"를 쓴 뒤 줄을 바꾸는 print()가 빠졌는지 확인.");
+    else if (E.length === 1 && A.length > 1 && A.join(" ").replace(/\s+/g, " ") === E[0].replace(/\s+/g, " ")) tips.push("한 줄에 이어서 출력해야 해요. print(값, end=\" \")를 써 보세요.");
+    else if (i === E.length && A.length > E.length) tips.push(`정답 뒤에 ${A.length - E.length}줄이 더 출력됐어요. print가 반복문 안쪽에 들어가 있거나 반복 범위가 넓은지 확인.`);
+    else if (i === A.length && A.length < E.length) tips.push(`앞 ${A.length}줄은 맞는데 그 뒤가 빠졌어요. 반복 범위(range 끝 값은 포함되지 않음)나 조건을 확인.`);
+  }
+  if (i < E.length && i < A.length) {
+    const e = E[i], a = A[i];
+    if (hide) {
+      const ew = e.split(/\s+/), aw = a.split(/\s+/); let k = 0; while (k < ew.length && ew[k] === aw[k]) k++;
+      tips.push(`${i + 1}번째 줄의 ${k + 1}번째 값이 정답과 달라요 (내 값: ${aw[k] ?? "없음"}). 식을 다시 계산해 보세요.`);
+      return { tips, line: i };
+    }
+    if (e.replace(/\s/g, "") === a.replace(/\s/g, "")) {
+      const le = e.match(/^ */)[0].length, la = a.match(/^ */)[0].length;
+      if (le !== la) tips.push(`${i + 1}번째 줄 맨 앞 공백 수가 달라요: 정답 ${le}칸, 내 출력 ${la}칸.`);
+      else tips.push(`${i + 1}번째 줄의 띄어쓰기(공백)가 달라요. 쉼표(,)는 공백 1칸을 자동으로 넣고, +는 넣지 않아요. ‘공백 보기’를 켜고 비교해 보세요.`);
+    } else if (e.toLowerCase() === a.toLowerCase()) tips.push(`${i + 1}번째 줄의 대소문자가 달라요.`);
+    else {
+      const ew = e.split(/\s+/), aw = a.split(/\s+/);
+      const fl = ew.findIndex((w, k) => aw[k] !== undefined && w !== aw[k] && /^-?\d+(\.\d+)?$/.test(w) && /^-?\d+(\.\d+)?$/.test(aw[k]) && Number(w) === Number(aw[k]));
+      if (fl >= 0) tips.push(`숫자 값은 같지만 모양이 달라요 (정답 ${ew[fl]}, 내 출력 ${aw[fl]}). / 는 항상 실수(2.0), // 는 정수 몫이에요. int()/float() 변환도 확인.`);
+      if (i === 0 && /input\(\s*["']/.test(code)) tips.push("input(\"...\") 괄호 안의 안내 문구도 화면에 출력돼서 출력이 달라져요. 채점용 코드에서는 input()처럼 비워 두세요.");
+      if (a.startsWith(e) && a.length > e.length) tips.push(`${i + 1}번째 줄 끝에 내용이 더 붙었어요.`);
+      if (/^\[.*\]$/.test(a)) tips.push("대괄호 [ ]가 출력됐어요. split() 결과(목록)를 그대로 출력하지 않았는지 확인.");
+      if (!tips.length || tips.length === (A.length !== E.length ? 1 : 0)) tips.push(`${i + 1}번째 줄 ${firstDiff(e, a) + 1}번째 글자부터 달라요.`);
+    }
+  }
+  return { tips, line: i };
+}
+
+/* ───────────── 오류 설명(한국어) ───────────── */
+function explainError(e) {
+  const t = e.type, m = e.msg || "";
+  let title = "", causes = [];
+  const sugg = ((e.tb || "").match(/Did you mean: '([^']+)'\?/) || [])[1];
+  const has = (re) => re.test(m);
+  if (t === "SyntaxError") {
+    if (has(/expected ':'/)) { title = "콜론(:)이 빠졌어요"; causes = ["if, elif, else, while, for 줄 끝에는 반드시 : 을 붙여요."]; }
+    else if (has(/Maybe you meant '=='/) || has(/cannot assign to/)) { title = "조건식에서 = 를 썼어요"; causes = ["= 는 값을 저장(대입), 같은지 비교는 == 예요. 예) if x == 5:"]; }
+    else if (has(/unterminated string literal/)) { title = "따옴표가 닫히지 않았어요"; causes = ["문자열을 연 따옴표와 같은 종류로 닫았는지 확인.", "문자열 안에 같은 따옴표를 쓰려면 \\\" 를 쓰거나 다른 종류의 따옴표로 감싸요."]; }
+    else if (has(/unterminated triple-quoted/)) { title = "여러 줄 주석(\"\"\" 또는 ''')이 닫히지 않았어요"; causes = ["따옴표 3개로 연 주석을 같은 따옴표 3개로 닫아요."]; }
+    else if (has(/was never closed/)) { title = "괄호가 닫히지 않았어요"; causes = ["여는 괄호 개수와 닫는 괄호 개수를 맞춰요. 예) print(int(input())) → ( 3개, ) 3개"]; }
+    else if (has(/unmatched|does not match opening parenthesis/)) { title = "괄호 짝이 맞지 않아요"; causes = ["닫는 괄호가 더 많거나 ( 와 ] 처럼 종류가 섞였어요."]; }
+    else if (has(/invalid character '[“”‘’]'/)) { title = "둥근 따옴표(“ ” ‘ ’)가 들어갔어요"; causes = ["파이썬은 곧은 따옴표(\" ')만 인식해요.", "아이패드: 설정 → 일반 → 키보드 → ‘스마트 구두점’을 끄면 자동 변환이 멈춰요."]; }
+    else if (has(/invalid character/)) { title = "파이썬이 모르는 문자가 들어갔어요"; causes = ["한글 자판 상태에서 입력된 전각 기호（ ）， ： 같은 문자가 없는지 확인.", "영문 자판으로 바꿔 다시 입력해 보세요."]; }
+    else if (has(/invalid decimal literal/)) { title = "숫자 바로 뒤에 글자가 붙었어요"; causes = ["변수명은 숫자로 시작할 수 없어요 (1st → first).", "곱셈 기호가 빠졌을 수 있어요 (2x → 2*x)."]; }
+    else if (has(/Missing parentheses in call to 'print'/)) { title = "print에 괄호가 없어요"; causes = ["print \"Hi\" → print(\"Hi\")"]; }
+    else if (has(/forgot a comma/)) { title = "쉼표(,)가 빠진 것 같아요"; causes = ["print(\"합계\" total) → print(\"합계\", total)"]; }
+    else if (has(/expected 'else' after 'if' expression/)) { title = "삼항 연산자에 else가 없어요"; causes = ["형식: 값1 if 조건식 else 값2"]; }
+    else if (has(/'(.+)' is an illegal expression|cannot assign to (True|False|None)/)) { title = "예약어를 변수처럼 썼어요"; causes = ["if, for, while, True 같은 예약어는 변수명으로 쓸 수 없어요."]; }
+    else { title = "문법에 맞지 않는 부분이 있어요"; causes = ["표시된 위치 근처의 오타, 빠진 쉼표·연산자·괄호를 확인.", "표시된 줄이 멀쩡하면 바로 윗줄(괄호·따옴표가 안 닫혔는지)을 확인."]; }
+  } else if (t === "IndentationError") {
+    if (has(/expected an indented block/)) { title = "들여쓰기가 필요해요"; causes = [": 로 끝나는 줄(if, else, for, while…) 다음 줄은 4칸 들여써야 해요."]; }
+    else if (has(/unexpected indent/)) { title = "필요 없는 들여쓰기가 있어요"; causes = ["블록이 시작되지 않았는데 줄 앞에 공백이 있어요. 줄 맨 앞 공백을 지워 보세요."]; }
+    else if (has(/unindent does not match/)) { title = "내어쓰기 칸 수가 위와 맞지 않아요"; causes = ["같은 블록은 같은 칸 수로 맞춰요. 4칸과 2칸이 섞이지 않았는지 확인."]; }
+    else { title = "들여쓰기 오류"; causes = ["블록 안의 줄은 같은 칸 수(4칸)로 들여써요."]; }
+  } else if (t === "TabError") { title = "탭과 공백이 섞였어요"; causes = ["들여쓰기를 공백 4칸으로 통일해요. (이 편집기의 ⇥ 키는 공백 4칸을 넣어요.)"]; }
+  else if (t === "NameError") {
+    const nm = (m.match(/name '([^']+)'/) || [])[1] || "";
+    title = `‘${nm}’이라는 이름을 모르겠대요`;
+    if (/^(true|false|none)$/.test(nm)) causes.push(`True, False, None은 첫 글자가 대문자예요.`);
+    if (sugg) causes.push(`혹시 ‘${sugg}’를 쓰려던 것 아닌가요? (철자·대소문자)`);
+    causes.push("변수 이름의 철자·대소문자를 확인 (print ↔ Print, total ↔ Total).");
+    causes.push(`글자를 출력하려던 거라면 따옴표가 빠졌어요: print(${nm}) → print("${nm}")`);
+    causes.push("값을 저장하기 전에 먼저 사용하지 않았는지 줄 순서를 확인.");
+  } else if (t === "TypeError") {
+    if (has(/can only concatenate str \(not "(\w+)"\) to str/)) { title = "문자열과 숫자를 +로 붙일 수 없어요"; causes = ["쉼표를 쓰면 됩니다: print(\"합계:\", total)", "또는 str(숫자)로 바꿔서 +: \"합계: \" + str(total)", "input()으로 받은 값을 int()로 바꾸지 않아 문자열인 경우도 많아요."]; }
+    else if (has(/unsupported operand type\(s\) for (.+): '(\w+)' and '(\w+)'/)) {
+      title = "자료형이 달라서 계산할 수 없어요";
+      causes = ["한쪽이 문자열(str)이에요. input()은 항상 문자열 → int(input()) 또는 map(int, input().split())으로 바꿔요."];
+    }
+    else if (has(/'str' object cannot be interpreted as an integer/)) { title = "정수가 필요한 자리에 문자열이 들어갔어요"; causes = ["range(), chr() 같은 함수에는 정수를 넣어야 해요.", "input() 값을 int()로 바꿨는지, chr(\"i\")처럼 변수에 따옴표를 붙이지 않았는지 확인."]; }
+    else if (has(/'float' object cannot be interpreted as an integer/)) { title = "정수가 필요한 자리에 실수가 들어갔어요"; causes = ["/ 의 결과는 항상 실수예요. range()에 쓸 때는 // 를 쓰거나 int()로 바꿔요."]; }
+    else if (has(/not supported between instances of/)) { title = "서로 다른 자료형끼리 크기를 비교했어요"; causes = ["문자열과 숫자는 < > 로 비교할 수 없어요. 비교 전에 int()로 바꿔요."]; }
+    else if (has(/int\(\) argument must be a string.*not 'list'/)) { title = "목록(split 결과)을 통째로 int()에 넣었어요"; causes = ["한 줄의 여러 값은 a, b = map(int, input().split()) 처럼 받아요."]; }
+    else if (has(/can't multiply sequence by non-int/)) { title = "문자열에 정수가 아닌 값을 곱했어요"; causes = ["문자열 * 정수(반복)만 가능해요. 숫자 계산이라면 먼저 int()/float()로 바꿔요."]; }
+    else if (has(/object is not callable/)) { title = "함수가 아닌 것을 함수처럼 불렀어요"; causes = ["print, input, sum 같은 이름을 변수명으로 써서 덮어쓰지 않았는지 확인.", "곱셈 기호를 빠뜨렸을 수도 있어요: 2(x+1) → 2*(x+1)"]; }
+    else if (has(/cannot unpack non-iterable/)) { title = "값 하나를 여러 변수에 나눠 담으려 했어요"; causes = ["a, b = int(input()) ✗ → a, b = map(int, input().split()) ✓"]; }
+    else if (has(/'int' object is not iterable/)) { title = "정수는 for로 돌 수 없어요"; causes = ["for i in N: ✗ → for i in range(N): ✓"]; }
+    else if (has(/takes no keyword arguments|unexpected keyword argument/)) { const fn = (m.match(/^(\w+)\(\)/) || [])[1]; title = `${fn ? fn + "()" : "이 함수"}에는 end= 같은 이름 붙은 값을 넣을 수 없어요`; causes = ["괄호 위치를 확인: end=\" \"는 print()에만 쓸 수 있어요.", "예) print(chr(i, end=\" \")) ✗ → print(chr(i), end=\" \") ✓"]; }
+    else if (has(/takes exactly one argument|takes at most|takes \d+ positional|expected at most|missing \d+ required/)) { title = "함수에 넣은 값의 개수가 맞지 않아요"; causes = ["괄호가 닫히는 위치를 확인 (쉼표로 이어진 값이 엉뚱한 함수 안에 들어갔을 수 있어요)."]; }
+    else { title = "자료형이 맞지 않아요"; causes = ["값의 자료형(int, float, str)을 확인하고 필요하면 변환해요."]; }
+  } else if (t === "ValueError") {
+    const v = (m.match(/: '(.*)'$/) || [])[1];
+    if (has(/invalid literal for int\(\)/)) {
+      title = `‘${v}’을(를) 정수로 바꿀 수 없어요`;
+      if (v !== undefined && /\s/.test(v.trim())) causes.push("한 줄에 값이 여러 개 들어왔어요 → input().split()으로 나누고 map(int, …)으로 바꿔요.");
+      else if (v !== undefined && /\./.test(v)) causes.push("소수점이 있는 문자열은 int()로 못 바꿔요 → float()를 써요.");
+      else if (v === "") causes.push("빈 줄을 정수로 바꾸려 했어요. 입력칸에 값이 있는지, input() 횟수가 맞는지 확인.");
+      else causes.push("숫자가 아닌 글자가 섞였어요. 입력 형식을 다시 확인.");
+    } else if (has(/could not convert string to float/)) { title = "실수로 바꿀 수 없는 값이에요"; causes = ["한 줄에 여러 값이면 split()으로 나눠요.", "숫자가 아닌 글자가 섞였는지 확인."]; }
+    else if (has(/not enough values to unpack \(expected (\d+), got (\d+)\)/)) { const [, x, y] = m.match(/expected (\d+), got (\d+)/); title = `변수는 ${x}개인데 값은 ${y}개뿐이에요`; causes = ["입력이 한 줄에 몇 개씩 들어오는지 확인 (여러 줄에 나뉘어 있으면 input()을 여러 번)."]; }
+    else if (has(/too many values to unpack/)) { title = "값이 변수보다 많아요"; causes = ["split()으로 나눈 값의 개수와 변수 개수를 맞춰요."]; }
+    else { title = "값이 올바르지 않아요"; causes = ["함수에 넣은 값의 형식을 확인해요."]; }
+  } else if (t === "EOFError") { title = "입력이 모자라요"; causes = ["input()을 입력 줄 수보다 많이 불렀어요.", "한 줄에 두 값(예: 10 20)인데 input()을 두 번 쓰지 않았는지 → split() 사용.", "‘실행’할 때는 입력칸에 값을 먼저 적어야 해요."]; }
+  else if (t === "ZeroDivisionError") { title = "0으로 나눴어요"; causes = ["/, //, % 의 오른쪽 값이 0이 되지 않게 해요."]; }
+  else if (t === "AttributeError") { const mm = m.match(/'(\w+)' object has no attribute '(\w+)'/); title = mm ? `${mm[1]}에는 ‘${mm[2]}’ 기능이 없어요` : "없는 기능을 불렀어요"; causes = ["철자 확인 (spilt → split, strp → strip).", "int()로 바꾼 뒤에 split()을 부르지 않았는지 순서 확인."]; }
+  else if (t === "Timeout") { title = "실행이 끝나지 않아요 (무한 루프 의심)"; causes = ["색칠된 줄들이 계속 반복되고 있어요.", "while 조건에 쓰는 변수가 블록 안에서 바뀌는지 확인 (i += 1 빠짐).", "continue가 증가식(i += 1)보다 먼저 실행되면 같은 값에서 영원히 멈춰요."]; }
+  else if (t === "OutputLimit") { title = "출력이 너무 많아요 (무한 루프 의심)"; causes = ["print가 끝없이 반복됐어요. while 조건 변수가 바뀌는지 확인.", "색칠된 줄들이 계속 반복된 부분이에요."]; }
+  else if (t === "Hang") { title = "응답이 없어 엔진을 다시 시작했어요"; causes = ["아주 큰 수의 계산(예: 거듭제곱 폭발)이 있었는지 확인해요."]; }
+  else if (t === "Stopped") { title = "실행을 중지했어요"; causes = []; }
+  else if (t === "RecursionError") { title = "함수가 자기 자신을 끝없이 불렀어요"; causes = ["재귀를 멈추는 조건을 확인해요."]; }
+  else { title = `${t} 오류`; causes = ["아래 원래 오류 메시지를 확인해요."]; }
+  return { title, causes };
+}
+function errorHTML(e, code) {
+  if (!e) return "";
+  const x = explainError(e);
+  const L = (code || "").split("\n");
+  let where = "";
+  if (e.loopLines && e.loopLines.length) where = `반복되던 줄: ${e.loopLines[0]}${e.loopLines.length > 1 ? "~" + e.loopLines[e.loopLines.length - 1] : ""}번째 줄`;
+  else if (e.line) where = `${e.line}번째 줄${e.col ? `, ${e.col}번째 글자 근처` : ""}: <code>${esc((L[e.line - 1] || "").trim())}</code>`;
+  return `<div class="hint"><h4>${esc(x.title)}</h4>${where ? `<div class="where">${where}</div>` : ""}
+    ${x.causes.length ? `<ul>${x.causes.map((c) => `<li>${esc(c)}</li>`).join("")}</ul>` : ""}
+    ${e.tb ? `<pre class="tb">${esc(e.tb.trim())}</pre>` : ""}</div>`;
+}
+
+/* ───────────── 상태 표시 ───────────── */
+const ui = { engine: $("#st-engine"), offline: $("#st-offline") };
+Engine.onStatus((s, m) => {
+  const el = ui.engine;
+  el.className = "dot " + (s === "ready" ? "ok" : s === "error" ? "bad" : "busy");
+  el.textContent = s === "ready" ? `파이썬 ${Engine.version}` : s === "error" ? "엔진 오류" : "엔진 불러오는 중";
+  el.title = m || "";
+  const bn = $("#engine-banner");
+  if (s === "error") {
+    bn.classList.remove("hidden");
+    bn.innerHTML = `<h4>파이썬 엔진을 시작하지 못했어요</h4><div class="where">${esc(m || "")}</div><ul><li>아이패드 설정 → 일반 → 소프트웨어 업데이트로 iPadOS를 최신으로 올린 뒤 다시 열어 보세요.</li><li>처음 설치 중이었다면 인터넷에 연결한 채로 앱을 다시 열어 ‘오프라인 준비 완료’가 뜰 때까지 기다려요.</li></ul>`;
+  } else bn.classList.add("hidden");
+  $$(".needs-engine").forEach((b) => (b.disabled = s !== "ready"));
+});
+
+/* ───────────── 문제 화면 ───────────── */
+const PROBLEMS = DATA.problems;
+const PMAP = Object.fromEntries(PROBLEMS.map((p) => [p.id, p]));
+const P = { cur: null, editor: null, showWS: store.get("ws", false), running: false };
+
+function solvedMark(id) { const s = store.get("st." + id, null); return s === "ok" ? ["ok", "✓"] : s === "no" ? ["no", "✗"] : ["none", "○"]; }
+
+function renderProblemList() {
+  const chapters = [...new Set(PROBLEMS.map((p) => p.chapter))];
+  $("#plist").innerHTML = chapters.map((c) => {
+    const ps = PROBLEMS.filter((p) => p.chapter === c);
+    const done = ps.filter((p) => store.get("st." + p.id) === "ok").length;
+    return `<div class="chap"><span>${esc(c)}</span><span>${done}/${ps.length}</span></div>
+      <div class="plist">${ps.map((p) => { const [k, sym] = solvedMark(p.id);
+        return `<button data-id="${p.id}" aria-current="${P.cur && P.cur.id === p.id}"><span class="mark ${k}">${sym}</span><span>${esc(p.title.replace(/^.*- /, ""))}</span><span class="spacer"></span><span class="small">#${p.id}</span></button>`; }).join("")}</div>`;
+  }).join("");
+  const total = PROBLEMS.filter((p) => store.get("st." + p.id) === "ok").length;
+  $("#plist-total").textContent = `${total} / ${PROBLEMS.length} 통과`;
+}
+function openDrawer(on) { $("#drawer").classList.toggle("hidden", !on); if (on) renderProblemList(); }
+
+function problemHTML(p) {
+  const exs = p.examples.map((ex, i) => {
+    const hasIn = ex.in !== "" || p.examples.some((x) => x.in !== "");
+    return `<div class="ex ${hasIn ? "" : "noin"}">
+      ${hasIn ? `<div class="exbox"><div class="exh"><span>입력${p.examples.length > 1 ? " #" + (i + 1) : ""}</span><button class="linkbtn" data-fill="${i}">입력칸에 넣기</button></div><pre>${esc(ex.in)}</pre></div>` : ""}
+      <div class="exbox"><div class="exh"><span>출력${p.examples.length > 1 ? " #" + (i + 1) : ""}</span></div><pre>${esc(ex.out)}</pre></div></div>`;
+  }).join("");
+  const badges = (p.checks || []).map((c) => `<span class="badge ${c.hard ? "must" : "soft"}">${esc({ ifexp: "삼항 연산자 필수", while: "while문 필수", for: "for문 필수", continue: "continue 필수", print3: "쉼표 2개로 출력", vars: "변수 " + (c.names || []).join(", ") + " 사용" }[c.type] || c.type)}</span>`).join("");
+  return `
+    <div class="pnav"><button class="btn" id="btn-list" aria-label="문제 목록">☰ 목록</button>
+      <span class="spacer"></span><button class="btn" id="btn-prev" aria-label="이전 문제">‹</button><button class="btn" id="btn-next" aria-label="다음 문제">›</button></div>
+    <div class="pid">#${p.id} · ${esc(p.chapter)}</div>
+    <h1 class="ptitle">${esc(p.title)}</h1>${badges}
+    <div class="psec"><p>${md(p.desc)}</p></div>
+    ${p.input ? `<div class="psec"><h3>입력</h3><p>${md(p.input)}</p></div>` : ""}
+    ${p.output ? `<div class="psec"><h3>출력</h3><p>${md(p.output)}</p></div>` : ""}
+    <div class="psec"><h3>예제</h3>${exs}</div>
+    ${p.note ? `<p class="small" style="margin-top:10px">${esc(p.note)}</p>` : ""}
+    <p class="small" style="margin-top:10px">채점 테스트 ${p.tests.length}개 (예제 + 직접 만든 숨은 입력)</p>
+    <details class="reveal"><summary>힌트 보기</summary><p>${md(p.hint)}</p></details>
+    <details class="reveal"><summary>모범답안 보기</summary><pre class="answer">${segHTMLBlock(p.solution)}</pre></details>`;
+}
+function segHTMLBlock(code) { return tokenize(code).map((s) => segHTML(s)).join("\n"); }
+
+function openProblem(id) {
+  const p = PMAP[id] || PROBLEMS[0];
+  P.cur = p; store.set("lastP", p.id);
+  $("#ppane").innerHTML = problemHTML(p);
+  P.editor.value = store.get("code." + p.id, "");
+  const sv = store.get("stdin." + p.id, null);
+  $("#p-stdin").value = sv != null ? sv : (p.examples[0] ? p.examples[0].in : "");
+  $("#p-stdin-wrap").classList.toggle("hidden", !p.tests.some((t) => t.in !== ""));
+  $("#p-res").innerHTML = "";
+  P.steps = null;
+  $("#btn-list").onclick = () => openDrawer(true);
+  const idx = PROBLEMS.indexOf(p);
+  $("#btn-prev").disabled = idx === 0; $("#btn-next").disabled = idx === PROBLEMS.length - 1;
+  $("#btn-prev").onclick = () => go("#p/" + PROBLEMS[idx - 1].id);
+  $("#btn-next").onclick = () => go("#p/" + PROBLEMS[idx + 1].id);
+  $$("[data-fill]", $("#ppane")).forEach((b) => b.onclick = () => { $("#p-stdin").value = p.examples[+b.dataset.fill].in; store.set("stdin." + p.id, $("#p-stdin").value); toast("예제 입력을 넣었어요"); });
+  openDrawer(false);
+  if (location.hash !== "#p/" + p.id) history.replaceState(null, "", "#p/" + p.id);
+}
+
+function setRunning(on, which) {
+  P.running = on;
+  $$(".runbtn").forEach((b) => (b.disabled = on || !Engine.ready));
+  $$(".stopbtn").forEach((b) => b.classList.toggle("hidden", !on));
+}
+
+async function runOnce(editor, stdin, resEl) {
+  const code = editor.value;
+  editor.clearMarks();
+  resEl.innerHTML = `<div class="small">실행 중…</div>`;
+  setRunning(true);
+  const r = await Engine.run(code, stdin);
+  setRunning(false);
+  editor.markError(r.error);
+  return { r, code };
+}
+function outputBlock(text, label = "출력") {
+  return `<div class="row"><b style="font-size:14px">${label}</b><span class="spacer"></span><label class="small"><input type="checkbox" class="wstoggle" ${P.showWS ? "checked" : ""}> 공백 보기</label></div>
+    <pre class="outbox">${text === "" ? '<span class="small">(출력 없음)</span>' : showWS(text, P.showWS)}</pre>`;
+}
+function bindWS(root, rerender) {
+  $$(".wstoggle", root).forEach((c) => c.onchange = () => { P.showWS = c.checked; store.set("ws", P.showWS); rerender(); });
+}
+
+async function problemRun() {
+  const p = P.cur, stdin = $("#p-stdin").value;
+  const { r, code } = await runOnce(P.editor, stdin, $("#p-res"));
+  const draw = () => {
+    let h = "";
+    const match = p.tests.find((t) => normLines(t.in).join("\n") === normLines(stdin).join("\n"));
+    const c = match && !r.error ? compareOut(match.out, r.stdout) : null;
+    if (r.error) h += `<div class="verdict"><span class="big no">오류</span><span class="small">${esc(r.error.type)}</span></div>`;
+    else if (c) h += `<div class="verdict"><span class="big ${c.pass ? "ok" : "no"}">${c.pass ? "이 입력은 정답과 같아요" : "이 입력에서 정답과 달라요"}</span><span class="small">${r.ms}ms · 숨은 입력까지 확인하려면 ‘채점하기’</span></div>`;
+    else h += `<div class="verdict"><span class="big">실행 완료</span><span class="small">${r.ms}ms · 예제와 다른 입력이라 정답 비교는 안 함</span></div>`;
+    if (c && !c.pass) h += diffHTML(c, code, p.hideExpected);
+    else h += outputBlock(r.stdout, r.error ? "오류 전까지의 출력" : "출력");
+    h += errorHTML(r.error, code);
+    $("#p-res").innerHTML = h; bindWS($("#p-res"), draw);
+  };
+  draw();
+}
+
+function diffHTML(c, code, hide) {
+  const a = analyzeDiff(c.E, c.A, code, hide);
+  const tips = `<div class="hint warn"><h4>어디가 다른지</h4><ul>${a.tips.map((t) => `<li>${esc(t)}</li>`).join("")}</ul></div>`;
+  if (hide) return tips + `<pre class="outbox">${showWS(c.A.join("\n"), P.showWS)}</pre>`;
+  const n = Math.max(c.E.length, c.A.length);
+  const side = (arr, other, isExp) => {
+    let out = "";
+    for (let i = 0; i < n; i++) {
+      const l = arr[i];
+      if (l === undefined) { out += `<div class="dl miss"><span class="n">${i + 1}</span><span class="small">(없음)</span></div>`; continue; }
+      const o = other[i]; const bad = o !== l;
+      let body;
+      if (bad && i === a.line && o !== undefined) {
+        const j = firstDiff(l, o);
+        body = showWS(l.slice(0, j), P.showWS) + `<span class="ch">${showWS(l.slice(j, j + 1) || " ", P.showWS)}</span>` + showWS(l.slice(j + 1), P.showWS);
+      } else body = showWS(l, P.showWS) || " ";
+      out += `<div class="dl ${bad ? "bad" : ""}"><span class="n">${i + 1}</span><span>${body}</span></div>`;
+    }
+    return out;
+  };
+  return tips + `<div class="row" style="justify-content:flex-end"><label class="small"><input type="checkbox" class="wstoggle" ${P.showWS ? "checked" : ""}> 공백 보기</label></div>
+    <div class="diff"><div><h4>정답 출력</h4><pre class="outbox">${side(c.E, c.A, true)}</pre></div>
+    <div><h4>내 출력</h4><pre class="outbox">${side(c.A, c.E, false)}</pre></div></div>`;
+}
+
+function checkProblemRules(p, feats) {
+  const out = [];
+  if (!feats) return out;
+  for (const c of p.checks || []) {
+    let ok = true;
+    if (c.type === "ifexp") ok = feats.ifexp;
+    else if (c.type === "while") ok = feats.while;
+    else if (c.type === "for") ok = feats.for;
+    else if (c.type === "continue") ok = feats.continue;
+    else if (c.type === "print3") ok = feats.print_max_args >= 3;
+    else if (c.type === "vars") ok = c.names.every((n) => feats.assigned.includes(n));
+    if (!ok) out.push(c);
+  }
+  return out;
+}
+
+async function problemGrade() {
+  const p = P.cur, code = P.editor.value;
+  if (!code.trim()) { toast("코드를 먼저 작성하세요"); return; }
+  P.editor.clearMarks();
+  const res = $("#p-res");
+  res.innerHTML = `<div class="small">채점 중… (0/${p.tests.length})</div>`;
+  setRunning(true);
+  const results = [];
+  let stopped = false;
+  for (let i = 0; i < p.tests.length; i++) {
+    const t = p.tests[i];
+    const r = await Engine.run(code, t.in);
+    const c = r.error ? null : compareOut(t.out, r.stdout);
+    results.push({ t, r, c, pass: !!(c && c.pass) });
+    res.innerHTML = `<div class="small">채점 중… (${i + 1}/${p.tests.length})</div>`;
+    if (r.error && ["Timeout", "OutputLimit", "Hang", "Stopped", "SyntaxError", "IndentationError", "TabError"].includes(r.error.type)) { stopped = true; break; }
+  }
+  setRunning(false);
+  const npass = results.filter((x) => x.pass).length;
+  const allPass = npass === p.tests.length;
+  const broken = checkProblemRules(p, results[0] && results[0].r.features);
+  const hardBroken = broken.filter((c) => c.hard);
+  const ok = allPass && !hardBroken.length;
+  store.set("st." + p.id, ok ? "ok" : "no");
+  const firstBad = results.find((x) => !x.pass);
+  if (firstBad && firstBad.r.error) P.editor.markError(firstBad.r.error);
+  const draw = (openIdx) => {
+    let h = `<div class="verdict"><span class="big ${ok ? "ok" : allPass ? "warn" : "no"}">${ok ? "통과" : allPass ? "조건 위반" : "오답"}</span>
+      <span>${npass} / ${p.tests.length} 테스트 통과</span>${stopped && results.length < p.tests.length ? `<span class="small">(오류 때문에 나머지 ${p.tests.length - results.length}개는 실행하지 않음)</span>` : ""}</div>`;
+    for (const c of broken) h += `<div class="hint ${c.hard ? "" : "warn"}"><h4>${c.hard ? "문제 조건 위반" : "참고"}</h4>${esc(c.msg)}</div>`;
+    if (ok && results.some((x) => x.c && x.c.trailing)) h += `<div class="hint ok">줄 끝 공백이나 마지막 빈 줄은 무시하고 채점했어요.</div>`;
+    h += `<div class="tests">`;
+    results.forEach((x, i) => {
+      const label = i < p.examples.length && !p.examples[i].show && p.examples[i].in === x.t.in ? "예제" : "숨은 입력";
+      const why = x.pass ? "정답" : x.r.error ? `${x.r.error.type} (${explainError(x.r.error).title})` : "출력이 다름";
+      const open = openIdx === i;
+      h += `<div class="trow ${x.pass ? "ok" : "no"}"><button data-t="${i}" aria-expanded="${open}"><span class="mark ${x.pass ? "ok" : "no"}">${x.pass ? "✓" : "✗"}</span><span>테스트 ${i + 1} <span class="small">${label}</span></span><span class="spacer"></span><span class="small">${esc(why)}</span></button>`;
+      if (open) {
+        h += `<div class="tdetail">${x.t.in !== "" ? `<b style="font-size:14px">입력</b><pre class="outbox">${esc(x.t.in)}</pre>` : ""}`;
+        if (x.r.error) h += outputBlock(x.r.stdout, "오류 전까지의 출력") + errorHTML(x.r.error, code);
+        else if (!x.pass) h += diffHTML(x.c, code, p.hideExpected);
+        else h += outputBlock(x.r.stdout);
+        h += `</div>`;
+      }
+      h += `</div>`;
+    });
+    h += `</div>`;
+    res.innerHTML = h;
+    $$("[data-t]", res).forEach((b) => b.onclick = () => draw(openIdx === +b.dataset.t ? -1 : +b.dataset.t));
+    bindWS(res, () => draw(openIdx));
+  };
+  draw(firstBad ? results.indexOf(firstBad) : -1);
+  if (ok) toast("통과! 🎉");
+  renderProblemList();
+}
+
+/* ───────────── 한 줄씩 보기 ───────────── */
+async function stepRun(editor, stdin, resEl) {
+  const code = editor.value;
+  if (!code.trim()) { toast("코드를 먼저 작성하세요"); return; }
+  editor.clearMarks();
+  resEl.innerHTML = `<div class="small">실행 기록 만드는 중…</div>`;
+  setRunning(true);
+  const r = await Engine.run(code, stdin, { record: true });
+  setRunning(false);
+  const steps = r.steps || [];
+  if (!steps.length) { resEl.innerHTML = errorHTML(r.error, code) || `<div class="small">기록할 단계가 없어요.</div>`; editor.markError(r.error); return; }
+  let k = 0;
+  const draw = () => {
+    const s = steps[k], prev = steps[k - 1];
+    editor.setCurrent(s.line);
+    const isLast = k === steps.length - 1;
+    const vars = Object.entries(s.vars);
+    let h = `<div class="stepper"><div class="stepbar">
+      <button class="btn" data-a="first" aria-label="처음">⏮</button><button class="btn" data-a="prev" aria-label="이전 단계">◀</button>
+      <input type="range" min="0" max="${steps.length - 1}" value="${k}" aria-label="단계">
+      <button class="btn primary" data-a="next" aria-label="다음 단계">▶</button><button class="btn" data-a="last" aria-label="마지막">⏭</button>
+      <button class="btn ghost" data-a="close">닫기</button></div>
+      <div><b>${k + 1} / ${steps.length}단계</b> · ${s.line ? `이제 실행할 줄: <b>${s.line}번째 줄</b> <code>${esc((code.split("\n")[s.line - 1] || "").trim())}</code>` : "프로그램 끝"}
+      ${r.truncatedSteps ? `<div class="small">처음 ${steps.length}단계까지만 기록했어요.</div>` : ""}</div>
+      <div class="stepcols"><div><b style="font-size:14px">변수</b>${vars.length ? `<table class="vars"><tr><th>이름</th><th>값</th></tr>${vars.map(([n, [ty, v]]) => `<tr class="${prev && (!prev.vars[n] || prev.vars[n][1] !== v) ? "chg" : ""}"><td>${esc(n)} <span class="ty">${esc(ty)}</span></td><td class="v">${esc(v)}</td></tr>`).join("")}</table>` : `<p class="small">아직 변수가 없어요.</p>`}</div>
+      <div>${outputBlock(r.stdout.slice(0, s.out), "지금까지의 출력")}</div></div>
+      ${isLast && r.error ? errorHTML(r.error, code) : ""}</div>`;
+    resEl.innerHTML = h;
+    if (isLast && r.error) editor.markError(r.error), editor.setCurrent(null);
+    const act = (a) => { if (a === "first") k = 0; else if (a === "prev") k = Math.max(0, k - 1); else if (a === "next") k = Math.min(steps.length - 1, k + 1); else if (a === "last") k = steps.length - 1; else if (a === "close") { editor.setCurrent(null); resEl.innerHTML = ""; return; } draw(); };
+    $$("[data-a]", resEl).forEach((b) => b.onclick = () => act(b.dataset.a));
+    $("input[type=range]", resEl).oninput = (e) => { k = +e.target.value; draw(); };
+    bindWS(resEl, draw);
+  };
+  draw();
+}
+
+/* ───────────── 자유 실행 ───────────── */
+const F = { editor: null };
+async function freeRun() {
+  const stdin = $("#f-stdin").value;
+  const { r, code } = await runOnce(F.editor, stdin, $("#f-res"));
+  const draw = () => {
+    $("#f-res").innerHTML = `<div class="verdict"><span class="big ${r.error ? "no" : ""}">${r.error ? "오류" : "실행 완료"}</span><span class="small">${r.ms ?? 0}ms</span></div>` + outputBlock(r.stdout) + errorHTML(r.error, code);
+    bindWS($("#f-res"), draw);
+  };
+  draw();
+}
+
+/* ───────────── 모의고사 ───────────── */
+const X = { n: store.get("examN", 0) };
+function examState(n) { return store.get("exam." + n, { mc: {}, sa: {}, ov: {}, graded: false, result: null }); }
+function saveExam(n, s) { store.set("exam." + n, s); }
+const normT = (s) => String(s ?? "").trim().replace(/\s+/g, " ");
+const normCode = (s) => String(s ?? "").replace(/\s+/g, "").replace(/[‘’']/g, '"').replace(/[“”]/g, '"');
+function gradeField(f, v) {
+  v = v ?? "";
+  if (f.kind === "text") return f.ans.some((a) => normT(a).toLowerCase() === normT(v).toLowerCase());
+  if (f.kind === "code") return f.ans.some((a) => normCode(a) === normCode(v));
+  if (f.kind === "nums") { const g = (s) => (String(s).match(/-?\d+(?:\.\d+)?/g) || []).join(" "); return f.ans.some((a) => g(a) === g(v)); }
+  if (f.kind === "set") { const g = (s) => [...new Set(String(s).match(/[가나다라마바ㄱㄴㄷㄹㅁ]/g) || [])].sort().join(""); return g(f.ans.join("")) === g(v); }
+  if (f.kind === "keyword") return f.ans.some((a) => String(v).includes(a));
+  if (f.kind === "output") { const g = (s) => normLines(String(s).replace(/[∨˅]/g, " ")).join("\n"); return f.ans.some((a) => g(a) === g(v)); }
+  return false;
+}
+async function gradeRunField(f, v) {
+  if (!normT(v)) return false;
+  const L = f.template.split("\n");
+  const ind = (L[f.replace - 1].match(/^ */) || [""])[0];
+  L[f.replace - 1] = ind + String(v).trim();
+  const r = await Engine.run(L.join("\n"), f.in);
+  if (f.pass.out !== undefined) return !r.error && normLines(r.stdout).join("\n") === f.pass.out;
+  return !r.error || (f.pass.okOrErrorLine || []).includes(r.error.line);
+}
+function partFields(part) { return part.kind === "multi" ? part.fields : [part]; }
+
+function renderExam() {
+  const n = X.n, E = DATA.exams[n], st = examState(n);
+  $$(".seg button", $("#v-exam")).forEach((b, i) => b.setAttribute("aria-pressed", i === n));
+  const res = st.graded ? st.result : null;
+  const qHTML = (it) => {
+    const r = res && res.items[it.no];
+    const mark = r ? (r.score === it.pts ? "okm" : "nom") : "";
+    let h = `<article class="q" id="q-${esc(String(it.no))}"><div class="qh"><span class="qno ${mark}">${typeof it.no === "number" ? it.no + "." : ""}</span><div>${typeof it.no === "number" ? "" : `<b>[${esc(it.no)}]</b> `}${md(it.q, false)} <span class="pts">[${it.pts}점]</span></div></div>`;
+    if (it.bogi) h += `<div class="bogi">${it.bogi.map((b) => `<div>${md(b, false)}</div>`).join("")}</div>`;
+    if (it.code) h += `<pre class="qcode ${it.codeLines ? "lines" : ""}">${it.codeLines ? it.code.split("\n").map((l) => `<span>${esc(l)}</span>`).join("") : esc(it.code)}</pre>`;
+    if (it.type === "mc") {
+      h += `<ol class="opts">${it.opts.map((o, i) => {
+        const picked = st.mc[it.no] === i + 1;
+        const cls = res ? (i + 1 === it.ans ? "right" : picked ? "wrongpick" : "") : "";
+        return `<li><button class="opt ${cls}" data-mc="${it.no}" data-v="${i + 1}" aria-pressed="${picked}"><span class="bub">${i + 1}</span><span class="ot ${it.optsCode ? "code" : ""}">${it.optsCode ? esc(o) : md(o, false)}</span></button></li>`;
+      }).join("")}</ol>`;
+    } else {
+      it.parts.forEach((part, pi) => {
+        const pr = r && r.parts[pi];
+        h += `<div class="sapart"><span class="lab">${esc(part.label)}</span>${part.q ? md(part.q, false) : ""} <span class="pts">(${part.pts}점)</span>`;
+        if (part.kind === "multi") {
+          h += `<div class="fieldrow">${part.fields.map((f, fi) => `<div style="${f.kind === "run" ? "flex:2.3" : ""}"><div class="fn">${esc(f.name)}</div>${inputFor(f, it.no, pi + "." + fi, st)}</div>`).join("")}</div>`;
+        } else h += inputFor(part, it.no, String(pi), st);
+        if (pr) {
+          const ovKey = it.no + "#" + pi;
+          h += `<div class="verd ${pr.ok ? "ok" : "no"}">${pr.ok ? "✓ 맞음" : "✗ 틀림"} · ${pr.score}점
+            ${pr.auto ? "" : ""}<label class="override"><input type="checkbox" data-ov="${esc(ovKey)}" ${st.ov[ovKey] ? "checked" : ""}> 내 답도 맞음(직접 인정)</label></div>
+            <div class="small">모범답안: ${partFields(part).map((f) => `<code>${esc(f.show || (f.ans && f.ans[0]) || "")}</code>`).join(" / ")}</div>`;
+        }
+        h += `</div>`;
+      });
+    }
+    if (res) h += `<div class="expl"><b>${it.type === "mc" ? "정답 " + CIRC[it.ans - 1] : "해설"}</b> · ${esc(it.cat)} · ${esc(it.topic)}<br>${md(it.exp, false)}</div>`;
+    h += `</article>`;
+    return h;
+  };
+  const mcs = E.items.filter((i) => i.type === "mc"), sas = E.items.filter((i) => i.type === "sa");
+  let sc = "";
+  if (res) {
+    const wrong = E.items.filter((it) => res.items[it.no].score < it.pts);
+    sc = `<div class="scorecard"><div class="tot">${fmt(res.total)}<small> / 100</small></div>
+      <div>기본 <b>${fmt(res.basic)}</b> / 70 · 응용 <b>${fmt(res.applied)}</b> / 30</div>
+      <div class="small" style="flex-basis:100%">${wrong.length ? "다시 볼 문항: " + wrong.map((it) => `<a href="#" data-jump="${esc(String(it.no))}">${esc(String(it.no))}(${esc(it.topic)})</a>`).join(", ") : "모두 맞았어요."}</div></div>`;
+  }
+  $("#exam-body").innerHTML = sc + `<div class="sheet"><div class="sheet-head"><div class="t"><b>프로그래밍 이론 모의고사 ${esc(E.title)}</b><br><span class="small">범위: 출력과 입력 · 변수 · 연산자 · 선택제어문 · 반복제어문 / 객관식 20문항(60점) · 서답형 5문항(40점)</span></div>
+    <div class="s"><div class="small">점수</div><div class="score">${res ? fmt(res.total) : ""}</div></div></div>
+    <div class="qgrid">${mcs.map(qHTML).join("")}</div>
+    <h2 style="font-size:17px;border-top:2px solid var(--ink);padding-top:12px;margin-top:6px">서답형</h2>
+    <div class="qgrid">${sas.map(qHTML).join("")}</div></div>`;
+  $("#exam-grade").textContent = st.graded ? "다시 채점하기" : "채점하기";
+  bindExam();
+}
+const fmt = (x) => (Math.round(x * 10) / 10).toString();
+function inputFor(f, no, key, st) {
+  const v = (st.sa[no] || {})[key] ?? "";
+  const common = `data-sa="${esc(String(no))}" data-k="${key}" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false"`;
+  if (f.kind === "output") return `<textarea class="plain" rows="3" ${common} placeholder="실행 결과 (공백은 그대로 입력)">${esc(v)}</textarea>`;
+  return `<input class="plain" ${common} value="${esc(v)}" placeholder="${f.kind === "run" ? "고친 코드 한 줄" : "답"}">`;
+}
+function bindExam() {
+  const n = X.n;
+  $$("[data-mc]").forEach((b) => b.onclick = () => {
+    const st = examState(n); const no = b.dataset.mc, v = +b.dataset.v;
+    st.mc[no] = st.mc[no] === v ? undefined : v; saveExam(n, st);
+    $$(`[data-mc="${no}"]`).forEach((x) => x.setAttribute("aria-pressed", st.mc[no] === +x.dataset.v));
+  });
+  $$("[data-sa]").forEach((el) => el.oninput = () => {
+    const st = examState(n); (st.sa[el.dataset.sa] = st.sa[el.dataset.sa] || {})[el.dataset.k] = el.value.replace(/[“”]/g, '"').replace(/[‘’]/g, "'"); saveExam(n, st);
+  });
+  $$("[data-ov]").forEach((c) => c.onchange = () => { const st = examState(n); st.ov[c.dataset.ov] = c.checked; saveExam(n, st); recomputeExam(n); renderExam(); });
+  $$("[data-jump]").forEach((a) => a.onclick = (e) => { e.preventDefault(); const el = document.getElementById("q-" + a.dataset.jump); el && el.scrollIntoView({ behavior: "smooth", block: "center" }); });
+}
+function recomputeExam(n) {
+  const E = DATA.exams[n], st = examState(n); if (!st.result) return;
+  let total = 0, basic = 0, applied = 0;
+  for (const it of E.items) {
+    const r = st.result.items[it.no];
+    if (it.type === "sa") r.score = r.parts.reduce((s, pr, pi) => { const ov = st.ov[it.no + "#" + pi]; pr.ok = pr.autoOk || !!ov; pr.score = pr.ok ? it.parts[pi].pts : pr.autoScore; return s + pr.score; }, 0);
+    total += r.score; if (it.cat === "기본") basic += r.score; else applied += r.score;
+  }
+  Object.assign(st.result, { total, basic, applied }); saveExam(n, st);
+}
+async function gradeExam() {
+  const n = X.n, E = DATA.exams[n], st = examState(n);
+  const btn = $("#exam-grade"); btn.disabled = true; btn.textContent = "채점 중…";
+  const items = {};
+  for (const it of E.items) {
+    if (it.type === "mc") { items[it.no] = { score: st.mc[it.no] === it.ans ? it.pts : 0 }; continue; }
+    const parts = [];
+    for (let pi = 0; pi < it.parts.length; pi++) {
+      const part = it.parts[pi]; const fields = partFields(part);
+      let okCount = 0;
+      for (let fi = 0; fi < fields.length; fi++) {
+        const f = fields[fi]; const key = part.kind === "multi" ? pi + "." + fi : String(pi);
+        const v = (st.sa[it.no] || {})[key];
+        const ok = f.kind === "run" ? (Engine.ready ? await gradeRunField(f, v) : gradeField({ kind: "code", ans: f.ans }, v)) : gradeField(f, v);
+        if (ok) okCount++;
+      }
+      const autoOk = okCount === fields.length;
+      const autoScore = Math.round((part.pts * okCount / fields.length) * 10) / 10;
+      parts.push({ autoOk, autoScore, ok: autoOk, score: autoScore });
+    }
+    items[it.no] = { parts, score: 0 };
+  }
+  st.graded = true; st.result = { items }; saveExam(n, st);
+  recomputeExam(n);
+  btn.disabled = false;
+  renderExam();
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+/* ───────────── 도움말 ───────────── */
+function renderHelp() {
+  const samples = [
+    ["SyntaxError", "expected ':'", "if n > 3"], ["SyntaxError", "invalid syntax. Maybe you meant '==' or ':=' instead of '='?", "if x = 5:"],
+    ["SyntaxError", "unterminated string literal (detected at line 1)", "print('abc)"], ["SyntaxError", "'(' was never closed", "print((1+2)"],
+    ["SyntaxError", "invalid character '“' (U+201C)", "print(“hi”)"], ["IndentationError", "expected an indented block after 'if' statement on line 1", "if True:\nprint(1)"],
+    ["IndentationError", "unexpected indent", "  print(1)"], ["NameError", "name 'Hello' is not defined", "print(Hello)"],
+    ["TypeError", "can only concatenate str (not \"int\") to str", "print(\"합계:\" + 10)"], ["TypeError", "unsupported operand type(s) for +: 'int' and 'str'", "a = 10\nb = input()\nprint(a + b)"],
+    ["TypeError", "'str' object cannot be interpreted as an integer", "for i in range(input()):"], ["ValueError", "invalid literal for int() with base 10: '10 20'", "a = int(input())  # 입력: 10 20"],
+    ["ValueError", "invalid literal for int() with base 10: '3.5'", "a = int(input())  # 입력: 3.5"], ["ValueError", "not enough values to unpack (expected 3, got 2)", "a, b, c = input().split()  # 입력: 1 2"],
+    ["EOFError", "EOF when reading a line", "a = input()\nb = input()  # 입력이 한 줄뿐"], ["ZeroDivisionError", "division by zero", "print(10 / 0)"],
+    ["Timeout", "", "i = 1\nwhile i <= 10:\n    print(i)"],
+  ];
+  $("#help-errors").innerHTML = samples.map(([t, m, c]) => { const x = explainError({ type: t, msg: m, tb: "" });
+    return `<div class="errcard"><b>${esc(t === "Timeout" ? "무한 루프" : t)}</b>${m ? ` <span class="small">${esc(m)}</span>` : ""}<pre class="qcode">${esc(c)}</pre><div><b>${esc(x.title)}</b></div><ul>${x.causes.map((s) => `<li>${esc(s)}</li>`).join("")}</ul></div>`; }).join("");
+}
+
+/* ───────────── 화면 전환 ───────────── */
+function go(h) { if (location.hash === h) route(); else location.hash = h; }
+function route() {
+  const h = location.hash || "#p/" + store.get("lastP", PROBLEMS[0].id);
+  const [v, arg] = h.slice(1).split("/");
+  const view = { p: "v-prob", free: "v-free", exam: "v-exam", help: "v-help" }[v] || "v-prob";
+  $$(".view").forEach((el) => el.classList.toggle("hidden", el.id !== view));
+  $$("nav.tabs a").forEach((a) => a.setAttribute("aria-current", a.dataset.v === view ? "page" : "false"));
+  if (view === "v-prob") openProblem(arg || store.get("lastP", PROBLEMS[0].id));
+  if (view === "v-exam") { if (arg !== undefined && !isNaN(+arg)) X.n = Math.max(0, Math.min(DATA.exams.length - 1, +arg - 1)); renderExam(); }
+  if (view === "v-help") renderHelp();
+}
+
+/* ───────────── 오프라인 준비 상태 ───────────── */
+async function checkOffline() {
+  const el = ui.offline;
+  if (!("serviceWorker" in navigator) || !window.caches) { el.className = "dot bad"; el.textContent = "오프라인 미지원"; return; }
+  try {
+    const c = await caches.open(DATA.cacheName);
+    const hits = await Promise.all(DATA.assets.map((a) => c.match(new URL(a, location.href).href)));
+    const n = hits.filter(Boolean).length;
+    if (n === DATA.assets.length) { el.className = "dot ok"; el.textContent = "오프라인 준비 완료"; return true; }
+    el.className = "dot busy"; el.textContent = `오프라인 저장 중 ${Math.round(n / DATA.assets.length * 100)}%`;
+  } catch { el.className = "dot busy"; el.textContent = "오프라인 저장 중"; }
+  return false;
+}
+function initSW() {
+  if (!("serviceWorker" in navigator)) { checkOffline(); return; }
+  navigator.serviceWorker.register("sw.js").catch(() => {});
+  const tick = async () => { if (!(await checkOffline())) setTimeout(tick, 1500); };
+  tick();
+}
+
+/* ───────────── 시작 ───────────── */
+function init() {
+  P.editor = new Editor($("#p-editor"), { onChange: (v) => P.cur && store.set("code." + P.cur.id, v) });
+  F.editor = new Editor($("#f-editor"), { onChange: (v) => store.set("free.code", v) });
+  F.editor.value = store.get("free.code", "# 자유롭게 코드를 실행해 보세요\nname = input()\nprint(\"Hello,\", name)");
+  $("#f-stdin").value = store.get("free.stdin", "Jiho");
+  $("#f-stdin").oninput = () => store.set("free.stdin", $("#f-stdin").value);
+  $("#p-stdin").oninput = () => P.cur && store.set("stdin." + P.cur.id, $("#p-stdin").value);
+  $("#p-run").onclick = problemRun;
+  $("#p-grade").onclick = problemGrade;
+  $("#p-step").onclick = () => stepRun(P.editor, $("#p-stdin-wrap").classList.contains("hidden") ? "" : $("#p-stdin").value, $("#p-res"));
+  $("#p-reset").onclick = () => { if (confirm("이 문제의 코드를 지울까요?")) { P.editor.value = ""; store.set("code." + P.cur.id, ""); $("#p-res").innerHTML = ""; } };
+  $("#f-run").onclick = freeRun;
+  $("#f-step").onclick = () => stepRun(F.editor, $("#f-stdin").value, $("#f-res"));
+  $$(".stopbtn").forEach((b) => b.onclick = () => Engine.restart("stop"));
+  $("#drawer .shade").onclick = () => openDrawer(false);
+  $("#drawer-close").onclick = () => openDrawer(false);
+  $("#plist").onclick = (e) => { const b = e.target.closest("[data-id]"); if (b) go("#p/" + b.dataset.id); };
+  $$(".seg button", $("#v-exam")).forEach((b, i) => b.onclick = () => { X.n = i; store.set("examN", i); history.replaceState(null, "", "#exam/" + (i + 1)); renderExam(); });
+  $("#exam-grade").onclick = gradeExam;
+  $("#exam-reset").onclick = () => { if (confirm(`${DATA.exams[X.n].title} 답안을 모두 지울까요?`)) { saveExam(X.n, { mc: {}, sa: {}, ov: {}, graded: false, result: null }); renderExam(); } };
+  window.addEventListener("hashchange", route);
+  document.addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "Enter") { e.preventDefault(); const v = $(".view:not(.hidden)").id; if (v === "v-prob") problemGrade(); else if (v === "v-free") freeRun(); } });
+  $("#help-ver").textContent = `앱 버전 ${DATA.version} · 문제 ${PROBLEMS.length}개 · 모의고사 ${DATA.exams.length}회`;
+  Engine.start();
+  route();
+  initSW();
+}
+init();
+</script>
+</body>
+</html>
