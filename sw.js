@@ -1,5 +1,5 @@
 // 오프라인용 서비스 워커: 처음 열 때 앱 전체(파이썬 엔진 포함)를 기기에 저장하고, 이후에는 저장본으로 동작
-const CACHE = "pyj-27a1505638";
+const CACHE = "pyj-0a171a00ed";
 const ASSETS = ["./", "index.html", "worker.js", "runner.py", "manifest.webmanifest", "icon-180.png", "icon-192.png", "icon-512.png", "pyodide.mjs", "pyodide.asm.mjs", "pyodide.asm.wasm", "python_stdlib.zip", "pyodide-lock.json"];
 
 self.addEventListener("install", (e) => {
